@@ -20,7 +20,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
             "Content-Type: text/json\r\n" +
             "Connection: keep-alive\r\n" +
             "Content-Length: ").getBytes();
-    private byte[] bytesContent = new byte[5000];
+    private byte[] bytesContent = new byte[3000];
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
