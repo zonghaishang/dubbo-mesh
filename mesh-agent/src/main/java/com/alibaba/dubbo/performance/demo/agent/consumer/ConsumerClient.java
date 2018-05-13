@@ -33,7 +33,6 @@ public class ConsumerClient {
             "Content-Length: ").getBytes();
     private static byte[] RN = "\r\n".getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
-    private static byte[] CONTENT_LENGTH = "th: ".getBytes();
     private static int HeaderLength = 8;
 
 
@@ -57,20 +56,25 @@ public class ConsumerClient {
 
                             while (byteBuf.readableBytes() > HeaderLength){
                                 int dataLength = byteBuf.readInt();
-                                if(byteBuf.readableBytes() < dataLength){
+                                if(byteBuf.readableBytes() < dataLength + 4){
                                     byteBuf.resetReaderIndex();
                                     return;
                                 }
+                                byte[] bytes = new byte[dataLength];
+                                byteBuf.readBytes(bytes);
                                 int id = byteBuf.readInt();
-                                int resLength = dataLength - 4;
                                 ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                                 ByteBuf resByteBuf = ctx.alloc().directBuffer();
                                 resByteBuf.writeBytes(HTTP_HEAD);
-                                resByteBuf.writeInt(resLength);
+                                if (dataLength < 10) {
+                                    resByteBuf.writeByte('0' + dataLength);
+                                } else {
+                                    resByteBuf.writeByte('0' + dataLength / 10);
+                                    resByteBuf.writeByte('0' + dataLength % 10);
+                                }
                                 resByteBuf.writeBytes(RN_2);
-                                resByteBuf.writeBytes(byteBuf.slice(byteBuf.readerIndex(),resLength));
+                                resByteBuf.writeBytes(bytes);
                                 client.writeAndFlush(resByteBuf);
-                                byteBuf.skipBytes(resLength);
                             }
                         }
                     });
@@ -89,9 +93,10 @@ public class ConsumerClient {
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
+        byteBuf.writeInt(id);
         channelHandlerContextMap.put(id++,channelHandlerContext);
         ChannelFuture channelFuture = getChannel(WeightUtil.getRandom());
-        if(channelFuture!=null && channelFuture.isDone() && channelFuture.channel().isWritable()){
+        if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf);
         }else if(channelFuture!=null){
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));

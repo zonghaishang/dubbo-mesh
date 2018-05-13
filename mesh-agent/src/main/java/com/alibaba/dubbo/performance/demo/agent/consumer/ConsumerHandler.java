@@ -19,7 +19,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
             "Content-Type: text/json\r\n" +
             "Connection: keep-alive\r\n" +
             "Content-Length: ").getBytes();
-    private byte[] bytesContent = new byte[5000];
+    private byte[] bytesContent = new byte[3000];
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
@@ -58,22 +58,30 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
             return;
         }
         ByteBuf msgToSend = ctx.alloc().buffer();
-
+        int dataLengthIndex = msgToSend.writerIndex();
+        //数据总长度
+        msgToSend.writeInt(0);
+        int dataLength = 0;
         for (int start = i, eq = 0; i < bytes; i++) {
             if (bytesContent[i] == '=') {
                 eq = i;
             }
             if (bytesContent[i + 1] == '&' || i == bytes - 1) {
                 if (match(bytesContent, start, PARAMETER)) {
-                    msgToSend.writeInt(i - eq + 4);
-                    msgToSend.writeInt(-1);
-                    msgToSend.writeBytes(bytesContent);
-                    System.out.println("bytesContent:"+new String(bytesContent));
+                    //数据长度+保存数据长度的int
+                    dataLength += i - eq + 4;
+                    msgToSend.writeInt(i - eq);
+                    msgToSend.writeBytes(bytesContent,eq + 1,i - eq);
                     break;
                 }
                 start = i + 2;
             }
         }
+        int nowWriteIndex = msgToSend.writerIndex();
+        //把总长度写进去
+        msgToSend.writerIndex(dataLengthIndex);
+        msgToSend.writeInt(dataLength);
+        msgToSend.writerIndex(nowWriteIndex);
 
         consumerClient.send(ctx, msgToSend);
     }

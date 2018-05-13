@@ -9,9 +9,9 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
  */
 public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static byte[] RN_2 = "\r\n\n".getBytes();
-    byte[] bytes = new byte[200];
     //private static byte[] CONTENT_LENGTH = "Content-Length: ".getBytes();
-    private static byte[] CONTENT_LENGTH = "th: ".getBytes();
+    private static int HEADER_LENGTH = 4;
+
     @Override
     public void channelActive(ChannelHandlerContext ctx){
 
@@ -20,11 +20,23 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg){
         ByteBuf byteBuf = (ByteBuf)msg;
-        byteBuf.readBytes(bytes);
+        int allDataLength = byteBuf.readInt();
+        //数据的长度+id长度
+        if(byteBuf.readableBytes() < (allDataLength + HEADER_LENGTH)){
+            byteBuf.resetReaderIndex();
+            return;
+        }
         ByteBuf res = ctx.alloc().directBuffer();
-        res.writeInt(11);
-        res.writeInt(1);
-        res.writeBytes("123".getBytes());
+        int parameterLength = byteBuf.readInt();
+        byte[] bytes= new byte[parameterLength];
+        byteBuf.readBytes(bytes);
+        System.out.println(new String(bytes));
+        int id = byteBuf.readInt();
+        System.out.println(id);
+        //数据长度
+        res.writeInt(4);
+        res.writeBytes("1234".getBytes());
+        res.writeInt(id);
         ctx.writeAndFlush(res);
     }
 
