@@ -17,10 +17,12 @@ public class Endpoint {
         return port;
     }
 
+    @Override
     public String toString(){
         return host + ":" + port;
     }
 
+    @Override
     public boolean equals(Object o){
         if (!(o instanceof Endpoint)){
             return false;
@@ -29,6 +31,7 @@ public class Endpoint {
         return other.host.equals(this.host) && other.port == this.port;
     }
 
+    @Override
     public int hashCode(){
         return host.hashCode() + port;
     }

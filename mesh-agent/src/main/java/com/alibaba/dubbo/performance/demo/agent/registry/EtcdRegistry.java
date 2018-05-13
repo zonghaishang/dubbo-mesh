@@ -51,7 +51,8 @@ public class EtcdRegistry implements IRegistry{
     }
 
     // 向ETCD中注册服务
-    public void register(String serviceName,int port) throws Exception {
+    @Override
+    public void register(String serviceName, int port) throws Exception {
         // 服务注册的key为:    /dubbomesh/com.some.package.IHelloService/192.168.100.100:2000
         String strKey = MessageFormat.format("/{0}/{1}/{2}:{3}",rootPath,serviceName,IpHelper.getHostIp(),String.valueOf(port));
         ByteSequence key = ByteSequence.fromString(strKey);
@@ -73,6 +74,7 @@ public class EtcdRegistry implements IRegistry{
         );
     }
 
+    @Override
     public List<Endpoint> find(String serviceName) throws Exception {
 
         String strKey = MessageFormat.format("/{0}/{1}",rootPath,serviceName);

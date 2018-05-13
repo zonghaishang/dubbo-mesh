@@ -15,14 +15,14 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     ProviderClient providerClient;
     private static int HEADER_LENGTH = 4;
 
-    protected static final byte[] strStartBytes = ("\"2.0.1\"\n" +
+    protected static final byte[] STR_START_BYTES = ("\"2.0.1\"\n" +
             "\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"\n" +
             "null\n" +
             "\"hash\"\n" +
             "\"Ljava/lang/String;\"\n\"").getBytes();
-    protected static final byte[] strEndBytes   = "\"\n{\"path\":\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"}\n".getBytes();
+    protected static final byte[] STR_END_BYTES   = "\"\n{\"path\":\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"}\n".getBytes();
 
-    private static final int strLength = 173;
+    private static final int STR_LENGTH = 173;
 
     private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -56,12 +56,12 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
         byteBuf.resetReaderIndex();
 
         Bytes.long2bytes(id, header, 4);
-        Bytes.int2bytes(parameterLength + strLength, header, 12);
+        Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
 
         dubboRequest.writeBytes(header)
-                .writeBytes(strStartBytes)
+                .writeBytes(STR_START_BYTES)
                 .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
-                .writeBytes(strEndBytes);
+                .writeBytes(STR_END_BYTES);
         providerClient.send(ctx,dubboRequest,id);
         byteBuf.skipBytes(parameterLength + 4);
         //dubbo encode end
