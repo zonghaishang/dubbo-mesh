@@ -6,9 +6,8 @@ import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.WeightUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.collection.IntObjectMap;
@@ -49,6 +48,8 @@ public class ConsumerClient {
             log.info("endpoint host:{},port:{}",endpoint.getHost(),endpoint.getPort());
             Bootstrap bootstrap = new Bootstrap();
             bootstrap.channel(NioSocketChannel.class)
+                    .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+                    .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(10*1024))
                     .handler(new ChannelInboundHandlerAdapter() {
                         @Override
                         public void channelRead(ChannelHandlerContext ctx, Object msg){
@@ -60,10 +61,7 @@ public class ConsumerClient {
                                     byteBuf.resetReaderIndex();
                                     return;
                                 }
-                                byte[] bytes = new byte[dataLength];
-                                byteBuf.readBytes(bytes);
-                                int id = byteBuf.readInt();
-                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+                                //结果集
                                 ByteBuf resByteBuf = ctx.alloc().directBuffer();
                                 resByteBuf.writeBytes(HTTP_HEAD);
                                 if (dataLength < 10) {
@@ -73,7 +71,13 @@ public class ConsumerClient {
                                     resByteBuf.writeByte('0' + dataLength % 10);
                                 }
                                 resByteBuf.writeBytes(RN_2);
-                                resByteBuf.writeBytes(bytes);
+
+                                resByteBuf.writeBytes(byteBuf,byteBuf.readerIndex(),dataLength);
+                                byteBuf.skipBytes(dataLength);
+
+                                int id = byteBuf.readInt();
+                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+
                                 client.writeAndFlush(resByteBuf);
                             }
                         }
