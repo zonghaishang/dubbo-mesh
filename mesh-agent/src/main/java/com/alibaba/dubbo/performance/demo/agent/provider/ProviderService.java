@@ -4,8 +4,11 @@ import com.alibaba.dubbo.performance.demo.agent.consumer.ConsumerHandler;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -25,15 +28,17 @@ public class ProviderService {
         EventLoopGroup worker = new NioEventLoopGroup();
         bootstrap.group(worker)
                 .channel(NioServerSocketChannel.class)
+                .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
-                        //ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(1024));
+                        ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(10*1024));
                         ch.pipeline().addLast(new ProviderHandler());
                     }
                 });
         try {
             bootstrap.bind(providerServerPort).sync().channel().closeFuture().sync();
+            log.info("创建provider服务成功");
         } catch (InterruptedException e) {
             log.error("创建provider服务失败");
         }finally {

@@ -10,5 +10,6 @@ public class Constants {
     public static final String TYPE = "type";
     public static final String SERVER_NAME = "com.alibaba.dubbo.performance.demo.provider.IHelloService";
     public static final String ETCE = "etcd.url";
+    public static final String DUBBO_PROTOCOL_PORT = "dubbo.protocol.port";
 
 }

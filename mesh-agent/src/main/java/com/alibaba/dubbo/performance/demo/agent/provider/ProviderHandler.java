@@ -1,20 +1,38 @@
 package com.alibaba.dubbo.performance.demo.agent.provider;
 
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Bytes;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author 景竹 2018/5/12
  */
 public class ProviderHandler extends ChannelInboundHandlerAdapter {
-    private static byte[] RN_2 = "\r\n\n".getBytes();
-    //private static byte[] CONTENT_LENGTH = "Content-Length: ".getBytes();
+    private static final Logger log = LoggerFactory.getLogger(ProviderHandler.class);
+    ProviderClient providerClient;
     private static int HEADER_LENGTH = 4;
+
+    protected static final byte[] strStartBytes = ("\"2.0.1\"\n" +
+            "\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"\n" +
+            "null\n" +
+            "\"hash\"\n" +
+            "\"Ljava/lang/String;\"\n\"").getBytes();
+    protected static final byte[] strEndBytes   = "\"\n{\"path\":\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"}\n".getBytes();
+
+    private static final int strLength = 173;
+
+    private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
-
+        if (providerClient == null) {
+            log.info("init consumerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
+            providerClient = new ProviderClient();
+            providerClient.initConsumerClient(ctx);
+        }
     }
 
     @Override
@@ -26,7 +44,29 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
             byteBuf.resetReaderIndex();
             return;
         }
-        ByteBuf res = ctx.alloc().directBuffer();
+
+        ByteBuf dubboRequest = ctx.alloc().directBuffer();
+
+        //dubboRequest encode
+        int parameterLength = byteBuf.readInt();
+
+        byteBuf.markReaderIndex();
+        byteBuf.skipBytes(parameterLength);
+        int id = byteBuf.readInt();
+        byteBuf.resetReaderIndex();
+
+        Bytes.long2bytes(id, header, 4);
+        Bytes.int2bytes(parameterLength + strLength, header, 12);
+
+        dubboRequest.writeBytes(header)
+                .writeBytes(strStartBytes)
+                .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
+                .writeBytes(strEndBytes);
+        providerClient.send(ctx,dubboRequest,id);
+        byteBuf.skipBytes(parameterLength + 4);
+        //dubbo encode end
+
+        /*ByteBuf res = ctx.alloc().directBuffer();
         int parameterLength = byteBuf.readInt();
         byte[] bytes= new byte[parameterLength];
         byteBuf.readBytes(bytes);
@@ -37,7 +77,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
         res.writeInt(4);
         res.writeBytes("1234".getBytes());
         res.writeInt(id);
-        ctx.writeAndFlush(res);
+        ctx.writeAndFlush(res);*/
     }
 
 
