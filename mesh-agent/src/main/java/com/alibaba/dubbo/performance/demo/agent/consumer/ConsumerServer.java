@@ -34,6 +34,7 @@ public class ConsumerServer {
         try {
             bootstrap.bind(consumerServerPort)
                     .sync().channel().closeFuture().sync();
+            log.info("创建consumer服务成功");
         } catch (InterruptedException e) {
             log.error("创建consumer服务失败");
         }finally {

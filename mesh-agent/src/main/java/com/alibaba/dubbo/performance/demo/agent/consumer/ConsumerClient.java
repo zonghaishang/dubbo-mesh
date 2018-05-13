@@ -23,9 +23,18 @@ import java.util.List;
  */
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
-    IntObjectMap<ChannelFuture> channelFutureIntObjectMap = new IntObjectHashMap<>(50);
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextIntObjectMap = new IntObjectHashMap(400);
+    IntObjectMap<ChannelFuture> channelFutureMap = new IntObjectHashMap<>(50);
+    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(400);
     int id = 0;
+
+    private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
+            "Content-Type: text/json\r\n" +
+            "Connection: keep-alive\r\n" +
+            "Content-Length: ").getBytes();
+    private static byte[] RN = "\r\n".getBytes();
+    private static byte[] RN_2 = "\r\n\n".getBytes();
+    private static byte[] CONTENT_LENGTH = "th: ".getBytes();
+    private static int HeaderLength = 8;
 
 
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
@@ -42,28 +51,61 @@ public class ConsumerClient {
             Bootstrap bootstrap = new Bootstrap();
             bootstrap.channel(NioSocketChannel.class)
                     .handler(new ChannelInboundHandlerAdapter() {
+                        @Override
+                        public void channelRead(ChannelHandlerContext ctx, Object msg){
+                            ByteBuf byteBuf = (ByteBuf) msg;
 
+                            while (byteBuf.readableBytes() > HeaderLength){
+                                int dataLength = byteBuf.readInt();
+                                if(byteBuf.readableBytes() < dataLength){
+                                    byteBuf.resetReaderIndex();
+                                    return;
+                                }
+                                int id = byteBuf.readInt();
+                                int resLength = dataLength - 4;
+                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+                                ByteBuf resByteBuf = ctx.alloc().directBuffer();
+                                resByteBuf.writeBytes(HTTP_HEAD);
+                                resByteBuf.writeInt(resLength);
+                                resByteBuf.writeBytes(RN_2);
+                                resByteBuf.writeBytes(byteBuf.slice(byteBuf.readerIndex(),resLength));
+                                client.writeAndFlush(resByteBuf);
+                                byteBuf.skipBytes(resLength);
+                            }
+                        }
                     });
             bootstrap.group(channelHandlerContext.channel().eventLoop());
             ChannelFuture connectFuture = null;
             try {
                 connectFuture = bootstrap.connect(
-                        new InetSocketAddress(endpoint.getHost(), endpoint.getPort())).sync();
-            } catch (InterruptedException e) {
+                        new InetSocketAddress(endpoint.getHost(), endpoint.getPort()));
+            } catch (Exception e) {
                 log.error("创建到provider agent的连接失败",e);
             }
-            channelFutureIntObjectMap.put(endpoint.getPort(),connectFuture);
+            channelFutureMap.put(endpoint.getPort(),connectFuture);
+            log.error("创建到provider agent的连接成功");
         }
 
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
-        channelHandlerContextIntObjectMap.put(id++,channelHandlerContext);
+        channelHandlerContextMap.put(id++,channelHandlerContext);
         ChannelFuture channelFuture = getChannel(WeightUtil.getRandom());
-        channelFuture.channel().writeAndFlush(byteBuf);
+        if(channelFuture!=null && channelFuture.isDone() && channelFuture.channel().isWritable()){
+            channelFuture.channel().writeAndFlush(byteBuf);
+        }else if(channelFuture!=null){
+            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
+        }else {
+            ByteBuf res = channelHandlerContext.alloc().buffer();
+            res.writeBytes(HTTP_HEAD);
+            res.writeInt(0);
+            res.writeBytes(RN_2);
+            channelHandlerContext.writeAndFlush(res);
+        }
+
     }
 
     public ChannelFuture getChannel(int port){
-        return channelFutureIntObjectMap.get(port);
+        return channelFutureMap.get(port);
     }
 }

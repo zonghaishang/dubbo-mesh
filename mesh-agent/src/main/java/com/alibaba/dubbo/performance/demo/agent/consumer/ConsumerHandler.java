@@ -1,12 +1,8 @@
 package com.alibaba.dubbo.performance.demo.agent.consumer;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.collection.IntObjectHashMap;
-import io.netty.util.collection.IntObjectMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,21 +15,76 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     ConsumerClient consumerClient;
     private static byte[] CONTENT_LENGTH = "Content-Length: ".getBytes();
     private static byte[] PARAMETER = "parameter=".getBytes();
+    private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
+            "Content-Type: text/json\r\n" +
+            "Connection: keep-alive\r\n" +
+            "Content-Length: ").getBytes();
+    private byte[] bytesContent = new byte[5000];
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx){
-        if(consumerClient == null){
-            log.info("init consumerClient,ctx:{},thread id:{}",ctx.channel().id(),Thread.currentThread().getId());
+    public void channelActive(ChannelHandlerContext ctx) {
+        if (consumerClient == null) {
+            log.info("init consumerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
             consumerClient = new ConsumerClient();
             consumerClient.initConsumerClient(ctx);
         }
     }
+
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg){
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf byteBuf = (ByteBuf) msg;
-        System.out.println(byteBuf.indexOf(0,byteBuf.readableBytes(),CONTENT_LENGTH[0]));
-        System.out.println(CONTENT_LENGTH.toString());
-        //ctx.writeAndFlush(byteBuf);
-        consumerClient.send(ctx,byteBuf);
+        if(byteBuf.readableBytes() < HTTP_HEAD.length){
+            return;
+        }
+        int bytes = byteBuf.readableBytes();
+        byteBuf.readBytes(bytesContent, 0, bytes);
+
+        int i = 0;
+        int contentLength = 0;
+        for (; i < bytes; ) {
+            if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
+                if (contentLength == 0 && match(bytesContent, i, CONTENT_LENGTH)) {
+                    for (i += CONTENT_LENGTH.length; Character.isDigit(bytesContent[i]); i++) {
+                        contentLength = contentLength * 10 + bytesContent[i] - '0';
+                    }
+                } else if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
+                    break; // match body
+                }
+            }
+        }
+
+        if (bytes - i != contentLength) {
+            byteBuf.resetReaderIndex();
+            return;
+        }
+        ByteBuf msgToSend = ctx.alloc().buffer();
+
+        for (int start = i, eq = 0; i < bytes; i++) {
+            if (bytesContent[i] == '=') {
+                eq = i;
+            }
+            if (bytesContent[i + 1] == '&' || i == bytes - 1) {
+                if (match(bytesContent, start, PARAMETER)) {
+                    msgToSend.writeInt(i - eq + 4);
+                    msgToSend.writeInt(-1);
+                    msgToSend.writeBytes(bytesContent);
+                    System.out.println("bytesContent:"+new String(bytesContent));
+                    break;
+                }
+                start = i + 2;
+            }
+        }
+
+        consumerClient.send(ctx, msgToSend);
     }
+
+    private boolean match(byte[] bb, int offset, byte[] pattern) {
+        for (int i = 0; i < pattern.length && i + offset < bb.length; i++) {
+            if (bb[offset + i] != pattern[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 }
