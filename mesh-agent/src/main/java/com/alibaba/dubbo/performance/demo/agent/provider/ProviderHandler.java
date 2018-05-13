@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ProviderHandler.class);
-    ProviderClient providerClient;
+    private static ThreadLocal<ProviderClient> threadLocal = new ThreadLocal<>();
     private static int HEADER_LENGTH = 4;
 
     protected static final byte[] STR_START_BYTES = ("\"2.0.1\"\n" +
@@ -28,10 +28,11 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
-        if (providerClient == null) {
-            log.info("init consumerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
-            providerClient = new ProviderClient();
-            providerClient.initConsumerClient(ctx);
+        if (threadLocal.get() == null) {
+            log.info("init providerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
+            ProviderClient providerClient = new ProviderClient();
+            providerClient.initProviderClient(ctx);
+            threadLocal.set(providerClient);
         }
     }
 
@@ -63,7 +64,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                 .writeBytes(STR_END_BYTES);
         byteBuf.skipBytes(parameterLength + 4);
-        providerClient.send(ctx,dubboRequest,id);
+        threadLocal.get().send(ctx,dubboRequest,id);
 
         //dubbo encode end
 

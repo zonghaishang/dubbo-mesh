@@ -12,14 +12,14 @@ import org.slf4j.LoggerFactory;
 public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ConsumerHandler.class);
 
-    ConsumerClient consumerClient;
-    private static byte[] CONTENT_LENGTH = "Content-Length: ".getBytes();
+    private static ConsumerClient consumerClient;
+    private static byte[] CONTENT_LENGTH = "content-length: ".getBytes();
     private static byte[] PARAMETER = "parameter=".getBytes();
     private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
             "Content-Type: text/json\r\n" +
             "Connection: keep-alive\r\n" +
             "Content-Length: ").getBytes();
-    private byte[] bytesContent = new byte[3000];
+    private byte[] bytesContent = new byte[5000];
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
@@ -38,7 +38,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
         }
         int bytes = byteBuf.readableBytes();
         byteBuf.readBytes(bytesContent, 0, bytes);
-
+        System.out.println(new String(bytesContent));
         int i = 0;
         int contentLength = 0;
         for (; i < bytes; ) {

@@ -24,10 +24,10 @@ public class ProviderClient {
     IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(100);
     ChannelFuture channelFuture;
     public static final int HEADER_SIZE = 16;
+    String dubboHost = IpHelper.getHostIp();
+    int dubboPort = Integer.valueOf(System.getProperty(Constants.DUBBO_PROTOCOL_PORT));
 
-    public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
-        String dubboHost = IpHelper.getHostIp();
-        int dubboPort = Integer.valueOf(System.getProperty(Constants.DUBBO_PROTOCOL_PORT));
+    public void initProviderClient(ChannelHandlerContext channelHandlerContext) {
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.channel(NioSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
@@ -80,7 +80,7 @@ public class ProviderClient {
         } catch (Exception e) {
             log.error("创建到provider agent的连接失败", e);
         }
-        log.error("创建到provider agent的连接成功");
+        log.info("创建到dubbo的连接成功");
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {

@@ -25,14 +25,17 @@ public class ProviderService {
     public static void initProviderAgent() throws Exception {
         new EtcdRegistry(System.getProperty(Constants.ETCE)).register(Constants.SERVER_NAME,providerServerPort);
         ServerBootstrap bootstrap = new ServerBootstrap();
-        EventLoopGroup worker = new NioEventLoopGroup();
+        EventLoopGroup worker = new NioEventLoopGroup(8);
         bootstrap.group(worker)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
+                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(10 * 1024))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
                         ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(10*1024));
+                        ch.config().setConnectTimeoutMillis(300);
+                        ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.pipeline().addLast(new ProviderHandler());
                     }
                 });

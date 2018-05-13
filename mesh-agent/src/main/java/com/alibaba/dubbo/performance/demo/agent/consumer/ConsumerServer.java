@@ -2,7 +2,9 @@ package com.alibaba.dubbo.performance.demo.agent.consumer;
 
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -20,14 +22,17 @@ public class ConsumerServer {
 
     public static void initConsumerAgent(){
         ServerBootstrap bootstrap = new ServerBootstrap();
-        EventLoopGroup worker = new NioEventLoopGroup();
+        EventLoopGroup worker = new NioEventLoopGroup(8);
         bootstrap.group(worker)
                 .channel(NioServerSocketChannel.class)
+                .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(10 * 1024))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
                         ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(8 * 1024));
                         ch.config().setConnectTimeoutMillis(300);
+                        ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.pipeline().addLast(new ConsumerHandler());
                     }
                 });

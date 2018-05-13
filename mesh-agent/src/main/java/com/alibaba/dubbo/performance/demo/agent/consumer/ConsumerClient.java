@@ -90,7 +90,7 @@ public class ConsumerClient {
                 log.error("创建到provider agent的连接失败",e);
             }
             channelFutureMap.put(endpoint.getPort(),connectFuture);
-            log.error("创建到provider agent的连接成功");
+            log.info("创建到provider agent的连接成功");
         }
 
     }
