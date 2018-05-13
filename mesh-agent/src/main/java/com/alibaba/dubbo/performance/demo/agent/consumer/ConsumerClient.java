@@ -30,7 +30,6 @@ public class ConsumerClient {
             "Content-Type: text/json\r\n" +
             "Connection: keep-alive\r\n" +
             "Content-Length: ").getBytes();
-    private static byte[] RN = "\r\n".getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
     private static int HeaderLength = 8;
 

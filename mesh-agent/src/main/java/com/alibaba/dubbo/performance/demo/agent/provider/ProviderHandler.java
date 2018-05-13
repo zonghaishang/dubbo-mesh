@@ -62,8 +62,9 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 .writeBytes(STR_START_BYTES)
                 .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                 .writeBytes(STR_END_BYTES);
-        providerClient.send(ctx,dubboRequest,id);
         byteBuf.skipBytes(parameterLength + 4);
+        providerClient.send(ctx,dubboRequest,id);
+
         //dubbo encode end
 
         /*ByteBuf res = ctx.alloc().directBuffer();

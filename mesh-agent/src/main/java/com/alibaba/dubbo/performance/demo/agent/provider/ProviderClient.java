@@ -21,7 +21,7 @@ import java.net.InetSocketAddress;
 public class ProviderClient {
     private static final Logger log = LoggerFactory.getLogger(ProviderClient.class);
 
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(400);
+    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(100);
     ChannelFuture channelFuture;
     public static final int HEADER_SIZE = 16;
 
@@ -58,7 +58,8 @@ public class ProviderClient {
                         }
 
                         ByteBuf res = ctx.alloc().directBuffer();
-                        res.writeInt(dataLength);
+                        //跳过了双引号，因此长度-3
+                        res.writeInt(dataLength-3);
 
                         byteBuf.skipBytes(2);
                         res.writeBytes(byteBuf, byteBuf.readerIndex(), dataLength - 3);
