@@ -14,9 +14,9 @@ public class AgentApp {
     // 添加日志保存目录: -Dlogs.dir=/path/to/your/logs/dir。请安装自己的环境来设置日志目录。
 
     public static void main(String[] args) throws Exception {
-        System.setProperty("server.port","20000");
+        /*System.setProperty("server.port","20000");
         System.setProperty("type",Constants.CONSUMER);
-        System.setProperty("etcd.url","http://127.0.0.1:2379");
+        System.setProperty("etcd.url","http://127.0.0.1:2379");*/
 
         String type = System.getProperty(Constants.TYPE);
         if(!StringUtils.isEmpty(type) && type.equalsIgnoreCase(Constants.CONSUMER)){
