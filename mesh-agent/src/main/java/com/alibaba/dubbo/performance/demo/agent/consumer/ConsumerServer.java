@@ -30,7 +30,7 @@ public class ConsumerServer {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
-                        ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(8 * 1024));
+                        ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(10 * 1024));
                         ch.config().setConnectTimeoutMillis(300);
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.pipeline().addLast(new ConsumerHandler());

@@ -66,28 +66,17 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
         int dataLengthIndex = msgToSend.writerIndex();
         //数据总长度
         msgToSend.writeInt(0);
-        int dataLength = 0;
+        int dataLength = 4;
         for (int start = i; i < bytes; i++) {
             if (bytesContent[i] == '=' && bytesContent[i-1] == 'r'&& bytesContent[i-2] == 'e'){
                 start = i + 1;
-                dataLength = bytes - start + 4;
-                msgToSend.writeInt(bytes - start);
-                msgToSend.writeBytes(bytesContent,start,bytes-start);
+                int step = bytes - start;
+                dataLength = step + 4;
+                msgToSend.writeInt(step);
+                msgToSend.writeBytes(bytesContent,start,step);
+                break;
             }
 
-            /*if (bytesContent[i] == '=') {
-                eq = i;
-            }
-            if (bytesContent[i + 1] == '&' || i == bytes - 1) {
-                if (match(bytesContent, start, PARAMETER)) {
-                    //数据长度+保存数据长度的int
-                    dataLength += i - eq + 4;
-                    msgToSend.writeInt(i - eq);
-                    msgToSend.writeBytes(bytesContent,eq + 1,i - eq);
-                    break;
-                }
-                start = i + 2;
-            }*/
         }
         int nowWriteIndex = msgToSend.writerIndex();
         //把总长度写进去

@@ -100,9 +100,7 @@ public class ConsumerClient {
         ChannelFuture channelFuture = getChannel(port);
         if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf);
-            log.info("发送请求成功：port{}，id:{}",port,id);
         }else if(channelFuture!=null){
-            log.info("添加监听成功：port{}，id:{}",port,id);
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         }else {
             ByteBuf res = channelHandlerContext.alloc().buffer();

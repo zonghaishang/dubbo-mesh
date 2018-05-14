@@ -39,17 +39,14 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg){
         ByteBuf byteBuf = (ByteBuf)msg;
         int allDataLength = byteBuf.readInt();
-        //数据的长度+id长度
-        if(byteBuf.readableBytes() < (allDataLength + HEADER_LENGTH)){
+        //已经读了一个int，因此-4
+        if(byteBuf.readableBytes() < (allDataLength - 4)){
             byteBuf.resetReaderIndex();
             return;
         }
 
-        ByteBuf dubboRequest = ctx.alloc().directBuffer();
-
         //dubboRequest encode
         int parameterLength = byteBuf.readInt();
-
         byteBuf.markReaderIndex();
         byteBuf.skipBytes(parameterLength);
         int id = byteBuf.readInt();
@@ -58,12 +55,12 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
         Bytes.long2bytes(id, header, 4);
         Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
 
+        ByteBuf dubboRequest = ctx.alloc().directBuffer();
         dubboRequest.writeBytes(header)
                 .writeBytes(STR_START_BYTES)
                 .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                 .writeBytes(STR_END_BYTES);
         byteBuf.skipBytes(parameterLength + 4);
-        log.info("接收到请求 id：{}",id);
         providerClient.send(ctx,dubboRequest,id);
 
         //dubbo encode end

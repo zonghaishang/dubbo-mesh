@@ -1,6 +1,5 @@
 package com.alibaba.dubbo.performance.demo.agent.provider;
 
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Bytes;
 import com.alibaba.dubbo.performance.demo.agent.registry.IpHelper;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import io.netty.bootstrap.Bootstrap;
@@ -69,12 +68,11 @@ public class ProviderClient {
                         //System.out.println("id" + id);
                         //System.out.println("dataLength" + dataLength);
                         res.writeInt(id);
-                        log.info("接到dubbo返回值 id:{}",id);
                         ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                         client.writeAndFlush(res);
                     }
                 });
-        log.error("开始创建到dubbo的链接,host:{},ip:{}",dubboHost,dubboPort);
+        log.info("开始创建到dubbo的链接,host:{},ip:{}",dubboHost,dubboPort);
         channelFuture = bootstrap.group(channelHandlerContext.channel().eventLoop()).connect(new InetSocketAddress(dubboHost, dubboPort));
     }
 
@@ -82,10 +80,8 @@ public class ProviderClient {
         channelHandlerContextMap.put(id, channelHandlerContext);
         if (channelFuture != null && channelFuture.isDone()) {
             channelFuture.channel().writeAndFlush(byteBuf);
-            log.info("发送消息到dubbo id:{}",id);
         } else {
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
-            log.info("监听发送消息到dubbo id:{}",id);
         }
     }
 }
