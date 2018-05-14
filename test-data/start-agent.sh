@@ -12,7 +12,6 @@ if [[ "$1" == "consumer" ]]; then
        -Xms1536M \
        -Xmx1536M \
        -Xss256k \
-       -XX:+AggressiveOpts \
        -XX:+UseParallelOldGC \
        -Dtype=consumer \
        -Dserver.port=20000\
@@ -27,7 +26,6 @@ elif [[ "$1" == "provider-small" ]]; then
        -Xms512M \
        -Xmx512M \
        -Xss256k \
-       -XX:+AggressiveOpts \
        -XX:+UseParallelOldGC \
        -Dtype=provider \
        -Dserver.port=30000\
@@ -44,7 +42,6 @@ elif [[ "$1" == "provider-medium" ]]; then
        -Xms1536M \
        -Xmx1536M \
        -Xss256k \
-       -XX:+AggressiveOpts \
        -XX:+UseParallelOldGC \
        -Dtype=provider \
        -Dserver.port=30001\
@@ -61,7 +58,6 @@ elif [[ "$1" == "provider-large" ]]; then
        -Xms2560M \
        -Xmx2560M \
        -Xss256k \
-       -XX:+AggressiveOpts \
        -XX:+UseParallelOldGC \
        -Dtype=provider \
        -Dserver.port=30002\

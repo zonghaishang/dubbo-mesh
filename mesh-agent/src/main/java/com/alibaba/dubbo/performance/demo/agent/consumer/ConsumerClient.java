@@ -44,7 +44,7 @@ public class ConsumerClient {
             throw new IllegalStateException(e);
         }
         for (Endpoint endpoint : endpoints){
-            log.info("endpoint host:{},port:{}",endpoint.getHost(),endpoint.getPort());
+            log.info("注册中心找到的endpoint host:{},port:{}",endpoint.getHost(),endpoint.getPort());
             Bootstrap bootstrap = new Bootstrap();
             bootstrap.channel(NioSocketChannel.class)
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
@@ -86,11 +86,12 @@ public class ConsumerClient {
             try {
                 connectFuture = bootstrap.connect(
                         new InetSocketAddress(endpoint.getHost(), endpoint.getPort()));
+                log.info("创建到provider agent的连接成功,hots:{},port:{}",endpoint.getHost(),endpoint.getPort());
             } catch (Exception e) {
                 log.error("创建到provider agent的连接失败",e);
             }
             channelFutureMap.put(endpoint.getPort(),connectFuture);
-            log.info("创建到provider agent的连接成功");
+
         }
 
     }
@@ -98,6 +99,8 @@ public class ConsumerClient {
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
         byteBuf.writeInt(id);
         channelHandlerContextMap.put(id++,channelHandlerContext);
+        //int port  = WeightUtil.getRandom();
+        //log.info("发送请求,port：{}",port);
         ChannelFuture channelFuture = getChannel(WeightUtil.getRandom());
         if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf);

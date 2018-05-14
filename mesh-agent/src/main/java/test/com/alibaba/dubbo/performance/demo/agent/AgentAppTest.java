@@ -29,7 +29,7 @@ public class AgentAppTest {
     @Test
     public void testMain() throws Exception {
         System.setProperty("etcd.url","http://127.0.0.1:2379");
-        System.setProperty(Constants.NETTY_PORT,"8871");
+        System.setProperty(Constants.SERVER_PORT,"30000");
         System.setProperty(Constants.DUBBO_PROTOCOL_PORT,"20889");
         ProviderService.initProviderAgent();
     }

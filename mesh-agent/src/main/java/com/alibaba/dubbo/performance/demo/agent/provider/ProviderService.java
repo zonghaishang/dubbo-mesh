@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProviderService {
     private static final Logger log = LoggerFactory.getLogger(ProviderService.class);
-    private static int providerServerPort = Integer.valueOf(System.getProperty(Constants.NETTY_PORT));
+    private static int providerServerPort = Integer.valueOf(System.getProperty(Constants.SERVER_PORT));
 
     public static void initProviderAgent() throws Exception {
         new EtcdRegistry(System.getProperty(Constants.ETCE)).register(Constants.SERVER_NAME,providerServerPort);
@@ -29,17 +29,18 @@ public class ProviderService {
         bootstrap.group(worker)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
-                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(10 * 1024))
+                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(3 * 1024))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
-                        ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(10*1024));
+                        ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(3*1024));
                         ch.config().setConnectTimeoutMillis(300);
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.pipeline().addLast(new ProviderHandler());
                     }
                 });
         try {
+            log.info("开始创建provider服务,port:{}",providerServerPort);
             bootstrap.bind(providerServerPort).sync().channel().closeFuture().sync();
             log.info("创建provider服务成功");
         } catch (InterruptedException e) {

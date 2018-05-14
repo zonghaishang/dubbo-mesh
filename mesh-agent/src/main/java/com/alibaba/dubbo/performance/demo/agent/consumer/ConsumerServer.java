@@ -37,6 +37,7 @@ public class ConsumerServer {
                     }
                 });
         try {
+            log.info("开始创建服务,consumerServerPort:{}",consumerServerPort);
             bootstrap.bind(consumerServerPort)
                     .sync().channel().closeFuture().sync();
             log.info("创建consumer服务成功");

@@ -75,10 +75,11 @@ public class ProviderClient {
                 });
         bootstrap.group(channelHandlerContext.channel().eventLoop());
         try {
+            log.error("开始创建到dubbo的链接,host:{},ip:{}",dubboHost,dubboPort);
             channelFuture = bootstrap.connect(
                     new InetSocketAddress(dubboHost, dubboPort));
         } catch (Exception e) {
-            log.error("创建到provider agent的连接失败", e);
+            log.error("创建到dubbo的连接失败", e);
         }
         log.info("创建到dubbo的连接成功");
     }
