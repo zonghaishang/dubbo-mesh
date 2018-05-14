@@ -12,4 +12,8 @@ public class Constants {
     public static final String ETCE = "etcd.url";
     public static final String DUBBO_PROTOCOL_PORT = "dubbo.protocol.port";
 
+
+    public static final int RECEIVE_BUFFER_SIZE = 10 * 1024;
+    public static final int CONNECT_TIME_OUT = 200;
+
 }

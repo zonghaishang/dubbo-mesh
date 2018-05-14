@@ -4,6 +4,7 @@ import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Bytes;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,45 +39,36 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg){
         ByteBuf byteBuf = (ByteBuf)msg;
-        int allDataLength = byteBuf.readInt();
-        //已经读了一个int，因此-4
-        if(byteBuf.readableBytes() < (allDataLength - 4)){
-            byteBuf.resetReaderIndex();
-            return;
+        try {
+            while (byteBuf.isReadable()){
+                int allDataLength = byteBuf.readInt();
+                //已经读了一个int，因此-4
+                if(byteBuf.readableBytes() < (allDataLength - 4)){
+                    byteBuf.resetReaderIndex();
+                    return;
+                }
+
+                //dubboRequest encode
+                int parameterLength = byteBuf.readInt();
+                byteBuf.markReaderIndex();
+                byteBuf.skipBytes(parameterLength);
+                int id = byteBuf.readInt();
+                byteBuf.resetReaderIndex();
+
+                Bytes.long2bytes(id, header, 4);
+                Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
+
+                ByteBuf dubboRequest = ctx.alloc().directBuffer();
+                dubboRequest.writeBytes(header)
+                        .writeBytes(STR_START_BYTES)
+                        .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
+                        .writeBytes(STR_END_BYTES);
+                byteBuf.skipBytes(parameterLength + 4);
+                providerClient.send(ctx,dubboRequest,id);
+            }
+        }finally {
+            ReferenceCountUtil.release(msg);
         }
-
-        //dubboRequest encode
-        int parameterLength = byteBuf.readInt();
-        byteBuf.markReaderIndex();
-        byteBuf.skipBytes(parameterLength);
-        int id = byteBuf.readInt();
-        byteBuf.resetReaderIndex();
-
-        Bytes.long2bytes(id, header, 4);
-        Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
-
-        ByteBuf dubboRequest = ctx.alloc().directBuffer();
-        dubboRequest.writeBytes(header)
-                .writeBytes(STR_START_BYTES)
-                .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
-                .writeBytes(STR_END_BYTES);
-        byteBuf.skipBytes(parameterLength + 4);
-        providerClient.send(ctx,dubboRequest,id);
-
-        //dubbo encode end
-
-        /*ByteBuf res = ctx.alloc().directBuffer();
-        int parameterLength = byteBuf.readInt();
-        byte[] bytes= new byte[parameterLength];
-        byteBuf.readBytes(bytes);
-        System.out.println(new String(bytes));
-        int id = byteBuf.readInt();
-        System.out.println(id);
-        //数据长度
-        res.writeInt(4);
-        res.writeBytes("1234".getBytes());
-        res.writeInt(id);
-        ctx.writeAndFlush(res);*/
     }
 
 

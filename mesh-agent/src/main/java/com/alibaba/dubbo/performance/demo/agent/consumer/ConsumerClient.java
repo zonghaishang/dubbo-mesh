@@ -10,6 +10,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.collection.IntObjectMap;
 import org.slf4j.Logger;
@@ -23,8 +24,8 @@ import java.util.List;
  */
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
-    IntObjectMap<ChannelFuture> channelFutureMap = new IntObjectHashMap<>(50);
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(400);
+    IntObjectMap<ChannelFuture> channelFutureMap = new IntObjectHashMap<>(128);
+    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(128);
     int id = 0;
 
     /*private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
@@ -53,35 +54,42 @@ public class ConsumerClient {
             Bootstrap bootstrap = new Bootstrap();
             channelFutureMap.put(endpoint.getPort(),bootstrap.channel(NioSocketChannel.class)
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-                    .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(10*1024))
+                    .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.RECEIVE_BUFFER_SIZE))
                     .handler(new ChannelInboundHandlerAdapter() {
                         @Override
                         public void channelRead(ChannelHandlerContext ctx, Object msg){
                             ByteBuf byteBuf = (ByteBuf) msg;
+                            try{
+                                while (byteBuf.readableBytes() > HeaderLength){
+                                    int dataLength = byteBuf.readInt();
+                                    if(byteBuf.readableBytes() < dataLength + 4){
+                                        byteBuf.resetReaderIndex();
+                                        return;
+                                    }
+                                    //结果集
+                                    ByteBuf resByteBuf = ctx.alloc().directBuffer();
+                                    resByteBuf.writeBytes(HTTP_HEAD);
+                                    if (dataLength < 10) {
+                                        resByteBuf.writeByte('0' + dataLength);
+                                    } else {
+                                        resByteBuf.writeByte('0' + dataLength / 10);
+                                        resByteBuf.writeByte('0' + dataLength % 10);
+                                    }
+                                    resByteBuf.writeBytes(RN_2);
 
-                            while (byteBuf.readableBytes() > HeaderLength){
-                                int dataLength = byteBuf.readInt();
-                                if(byteBuf.readableBytes() < dataLength + 4){
-                                    byteBuf.resetReaderIndex();
-                                    return;
+                                    resByteBuf.writeBytes(byteBuf,byteBuf.readerIndex(),dataLength);
+                                    byteBuf.skipBytes(dataLength);
+
+                                    int id = byteBuf.readInt();
+                                    ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+                                    if(client != null){
+                                        client.writeAndFlush(resByteBuf);
+                                    }else {
+                                        ReferenceCountUtil.release(resByteBuf);
+                                    }
                                 }
-                                //结果集
-                                ByteBuf resByteBuf = ctx.alloc().directBuffer();
-                                resByteBuf.writeBytes(HTTP_HEAD);
-                                if (dataLength < 10) {
-                                    resByteBuf.writeByte('0' + dataLength);
-                                } else {
-                                    resByteBuf.writeByte('0' + dataLength / 10);
-                                    resByteBuf.writeByte('0' + dataLength % 10);
-                                }
-                                resByteBuf.writeBytes(RN_2);
-
-                                resByteBuf.writeBytes(byteBuf,byteBuf.readerIndex(),dataLength);
-                                byteBuf.skipBytes(dataLength);
-
-                                int id = byteBuf.readInt();
-                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
-                                client.writeAndFlush(resByteBuf);
+                            }finally {
+                                ReferenceCountUtil.release(msg);
                             }
                         }
                     }).group(channelHandlerContext.channel().eventLoop())
@@ -103,6 +111,7 @@ public class ConsumerClient {
         }else if(channelFuture!=null){
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         }else {
+            ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().buffer();
             res.writeBytes(HTTP_HEAD);
             res.writeByte('0'+ 0);

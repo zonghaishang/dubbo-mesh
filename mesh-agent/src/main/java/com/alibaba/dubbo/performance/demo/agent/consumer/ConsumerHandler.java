@@ -3,6 +3,7 @@ package com.alibaba.dubbo.performance.demo.agent.consumer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,53 +39,59 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf byteBuf = (ByteBuf) msg;
-        if(byteBuf.readableBytes() < HTTP_HEAD.length){
-            return;
-        }
-        int bytes = byteBuf.readableBytes();
-        byteBuf.readBytes(bytesContent, 0, bytes);
-        //System.out.println(new String(bytesContent));
-        int i = 0;
-        int contentLength = 0;
-        for (; i < bytes; ) {
-            if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
-                if (contentLength == 0 && match(bytesContent, i, CONTENT_LENGTH)) {
-                    for (i += CONTENT_LENGTH.length; Character.isDigit(bytesContent[i]); i++) {
-                        contentLength = contentLength * 10 + bytesContent[i] - '0';
-                    }
-                } else if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
-                    break; // match body
+        try{
+            while (byteBuf.isReadable()){
+                if(byteBuf.readableBytes() < HTTP_HEAD.length){
+                    return;
                 }
+                int bytes = byteBuf.readableBytes();
+                byteBuf.readBytes(bytesContent, 0, bytes);
+                //System.out.println(new String(bytesContent));
+                int i = 0;
+                int contentLength = 0;
+                for (; i < bytes; ) {
+                    if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
+                        if (contentLength == 0 && match(bytesContent, i, CONTENT_LENGTH)) {
+                            for (i += CONTENT_LENGTH.length; Character.isDigit(bytesContent[i]); i++) {
+                                contentLength = contentLength * 10 + bytesContent[i] - '0';
+                            }
+                        } else if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
+                            break; // match body
+                        }
+                    }
+                }
+
+                if (bytes - i != contentLength) {
+                    byteBuf.resetReaderIndex();
+                    return;
+                }
+                ByteBuf msgToSend = ctx.alloc().directBuffer();
+                int dataLengthIndex = msgToSend.writerIndex();
+                //数据总长度
+                msgToSend.writeInt(0);
+                int dataLength = 4;
+                for (int start = i; i < bytes; i++) {
+                    if (bytesContent[i] == '=' && bytesContent[i-1] == 'r'&& bytesContent[i-2] == 'e'){
+                        start = i + 1;
+                        int step = bytes - start;
+                        dataLength = step + 4;
+                        msgToSend.writeInt(step);
+                        msgToSend.writeBytes(bytesContent,start,step);
+                        break;
+                    }
+
+                }
+                int nowWriteIndex = msgToSend.writerIndex();
+                //把总长度写进去
+                msgToSend.writerIndex(dataLengthIndex);
+                msgToSend.writeInt(dataLength);
+                msgToSend.writerIndex(nowWriteIndex);
+
+                consumerClient.send(ctx, msgToSend);
             }
+        }finally {
+            ReferenceCountUtil.release(msg);
         }
-
-        if (bytes - i != contentLength) {
-            byteBuf.resetReaderIndex();
-            return;
-        }
-        ByteBuf msgToSend = ctx.alloc().buffer();
-        int dataLengthIndex = msgToSend.writerIndex();
-        //数据总长度
-        msgToSend.writeInt(0);
-        int dataLength = 4;
-        for (int start = i; i < bytes; i++) {
-            if (bytesContent[i] == '=' && bytesContent[i-1] == 'r'&& bytesContent[i-2] == 'e'){
-                start = i + 1;
-                int step = bytes - start;
-                dataLength = step + 4;
-                msgToSend.writeInt(step);
-                msgToSend.writeBytes(bytesContent,start,step);
-                break;
-            }
-
-        }
-        int nowWriteIndex = msgToSend.writerIndex();
-        //把总长度写进去
-        msgToSend.writerIndex(dataLengthIndex);
-        msgToSend.writeInt(dataLength);
-        msgToSend.writerIndex(nowWriteIndex);
-
-        consumerClient.send(ctx, msgToSend);
     }
 
     private boolean match(byte[] bb, int offset, byte[] pattern) {
