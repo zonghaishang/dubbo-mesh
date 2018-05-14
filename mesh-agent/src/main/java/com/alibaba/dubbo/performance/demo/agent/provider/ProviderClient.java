@@ -43,14 +43,16 @@ public class ProviderClient {
                         byteBuf.markReaderIndex();
                         byteBuf.skipBytes(3);
                         byte status = byteBuf.readByte();
-                        if (status != 20) {
-                            return;
-                        }
+
 
                         int id = (int) byteBuf.readLong();
 
                         int dataLength = byteBuf.readInt();
 
+                        if (status != 20) {
+                            byteBuf.skipBytes(dataLength);
+                            return;
+                        }
 
                         if (byteBuf.readableBytes() < dataLength) {
                             byteBuf.resetReaderIndex();
@@ -87,6 +89,7 @@ public class ProviderClient {
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
         channelHandlerContextMap.put(id, channelHandlerContext);
+        log.info("发送消息到dubbo id:{}",id);
         if (channelFuture != null && channelFuture.isDone()) {
             channelFuture.channel().writeAndFlush(byteBuf);
         } else {
