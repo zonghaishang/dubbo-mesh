@@ -69,6 +69,7 @@ public class ProviderClient {
                         //System.out.println("id" + id);
                         //System.out.println("dataLength" + dataLength);
                         res.writeInt(id);
+                        log.info("接到dubbo返回值 id:{}",id);
                         ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                         client.writeAndFlush(res);
                     }

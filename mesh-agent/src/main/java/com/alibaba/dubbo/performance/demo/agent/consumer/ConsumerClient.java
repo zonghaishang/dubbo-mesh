@@ -4,6 +4,7 @@ import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.WeightUtil;
+import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -50,7 +51,7 @@ public class ConsumerClient {
         for (Endpoint endpoint : endpoints){
             log.info("注册中心找到的endpoint host:{},port:{}",endpoint.getHost(),endpoint.getPort());
             Bootstrap bootstrap = new Bootstrap();
-            bootstrap.channel(NioSocketChannel.class)
+            channelFutureMap.put(endpoint.getPort(),bootstrap.channel(NioSocketChannel.class)
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                     .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(10*1024))
                     .handler(new ChannelInboundHandlerAdapter() {
@@ -83,18 +84,11 @@ public class ConsumerClient {
                                 client.writeAndFlush(resByteBuf);
                             }
                         }
-                    });
-            bootstrap.group(channelHandlerContext.channel().eventLoop());
-            ChannelFuture connectFuture = null;
-            try {
-                connectFuture = bootstrap.connect(
-                        new InetSocketAddress(endpoint.getHost(), endpoint.getPort()));
-                log.info("创建到provider agent的连接成功,hots:{},port:{}",endpoint.getHost(),endpoint.getPort());
-            } catch (Exception e) {
-                log.error("创建到provider agent的连接失败",e);
-            }
-            channelFutureMap.put(endpoint.getPort(),connectFuture);
-
+                    }).group(channelHandlerContext.channel().eventLoop())
+                    .connect(
+                            new InetSocketAddress(endpoint.getHost(), endpoint.getPort())));
+            log.info("创建到provider agent的连接成功,hots:{},port:{}",endpoint.getHost(),endpoint.getPort());
+            log.info("channelFutureMap key有：",JSON.toJSONString(channelFutureMap.keySet()));
         }
 
     }
@@ -102,17 +96,18 @@ public class ConsumerClient {
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
         byteBuf.writeInt(id);
         channelHandlerContextMap.put(id++,channelHandlerContext);
-        //int port  = WeightUtil.getRandom();
-        //log.info("发送请求,port：{}",port);
-        ChannelFuture channelFuture = getChannel(WeightUtil.getRandom());
+        int port  = WeightUtil.getRandom();
+        ChannelFuture channelFuture = getChannel(port);
         if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf);
+            log.info("发送请求成功：port{}，id:{}",port,id);
         }else if(channelFuture!=null){
+            log.info("添加监听成功：port{}，id:{}",port,id);
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         }else {
             ByteBuf res = channelHandlerContext.alloc().buffer();
             res.writeBytes(HTTP_HEAD);
-            res.writeInt(0);
+            res.writeByte('0'+ 0);
             res.writeBytes(RN_2);
             channelHandlerContext.writeAndFlush(res);
         }

@@ -64,6 +64,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                 .writeBytes(STR_END_BYTES);
         byteBuf.skipBytes(parameterLength + 4);
+        log.info("接收到请求 id：{}",id);
         threadLocal.get().send(ctx,dubboRequest,id);
 
         //dubbo encode end
