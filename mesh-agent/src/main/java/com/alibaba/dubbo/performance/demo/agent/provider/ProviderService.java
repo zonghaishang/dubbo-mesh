@@ -1,6 +1,5 @@
 package com.alibaba.dubbo.performance.demo.agent.provider;
 
-import com.alibaba.dubbo.performance.demo.agent.consumer.ConsumerHandler;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import io.netty.bootstrap.ServerBootstrap;
@@ -29,12 +28,12 @@ public class ProviderService {
         bootstrap.group(worker)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
-                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(3 * 1024))
+                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator( 1024))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
-                        ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(3*1024));
-                        ch.config().setConnectTimeoutMillis(300);
+                        ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(1024));
+                        //ch.config().setConnectTimeoutMillis(300);
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.pipeline().addLast(new ProviderHandler());
                     }

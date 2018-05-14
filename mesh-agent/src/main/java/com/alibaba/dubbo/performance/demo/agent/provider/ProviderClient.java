@@ -31,12 +31,11 @@ public class ProviderClient {
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.channel(NioSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(10 * 1024))
+                .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(1024))
                 .handler(new ChannelInboundHandlerAdapter() {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) {
                         ByteBuf byteBuf = (ByteBuf) msg;
-
                         if (byteBuf.readableBytes() <= HEADER_SIZE) {
                             return;
                         }
@@ -44,12 +43,11 @@ public class ProviderClient {
                         byteBuf.skipBytes(3);
                         byte status = byteBuf.readByte();
 
-
                         int id = (int) byteBuf.readLong();
 
                         int dataLength = byteBuf.readInt();
-
                         if (status != 20) {
+                            log.error("非20结果集");
                             byteBuf.skipBytes(dataLength);
                             return;
                         }
@@ -84,16 +82,16 @@ public class ProviderClient {
         } catch (Exception e) {
             log.error("创建到dubbo的连接失败", e);
         }
-        log.info("创建到dubbo的连接成功");
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
         channelHandlerContextMap.put(id, channelHandlerContext);
-        log.info("发送消息到dubbo id:{}",id);
         if (channelFuture != null && channelFuture.isDone()) {
             channelFuture.channel().writeAndFlush(byteBuf);
+            log.info("发送消息到dubbo id:{}",id);
         } else {
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
+            log.info("监听发送消息到dubbo id:{}",id);
         }
     }
 }

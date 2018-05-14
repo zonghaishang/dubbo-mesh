@@ -88,7 +88,7 @@ public class ConsumerClient {
                     .connect(
                             new InetSocketAddress(endpoint.getHost(), endpoint.getPort())));
             log.info("创建到provider agent的连接成功,hots:{},port:{}",endpoint.getHost(),endpoint.getPort());
-            log.info("channelFutureMap key有：",JSON.toJSONString(channelFutureMap.keySet()));
+            log.info("channelFutureMap key有：{}",JSON.toJSONString(channelFutureMap.keySet()));
         }
 
     }
