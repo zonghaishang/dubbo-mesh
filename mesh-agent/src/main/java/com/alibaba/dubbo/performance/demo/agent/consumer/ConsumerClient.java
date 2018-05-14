@@ -26,10 +26,14 @@ public class ConsumerClient {
     IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(400);
     int id = 0;
 
-    private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
+    /*private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
             "Content-Type: text/json\r\n" +
             "Connection: keep-alive\r\n" +
-            "Content-Length: ").getBytes();
+            "Content-Length: ").getBytes();*/
+    private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
+            "content-type: text/json\r\n" +
+            "connection: keep-alive\r\n" +
+            "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
     private static int HeaderLength = 8;
 
@@ -76,7 +80,6 @@ public class ConsumerClient {
 
                                 int id = byteBuf.readInt();
                                 ChannelHandlerContext client = channelHandlerContextMap.remove(id);
-
                                 client.writeAndFlush(resByteBuf);
                             }
                         }

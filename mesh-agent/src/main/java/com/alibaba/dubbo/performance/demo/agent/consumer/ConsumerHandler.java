@@ -13,13 +13,17 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ConsumerHandler.class);
 
     private static ConsumerClient consumerClient;
-    private static byte[] CONTENT_LENGTH = "Content-Length: ".getBytes();
-    //private static byte[] CONTENT_LENGTH = "content-length: ".getBytes();
+    //private static byte[] CONTENT_LENGTH = "Content-Length: ".getBytes();
+    private static byte[] CONTENT_LENGTH = "content-length: ".getBytes();
     private static byte[] PARAMETER = "parameter=".getBytes();
-    private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
+    /*private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
             "Content-Type: text/json\r\n" +
             "Connection: keep-alive\r\n" +
-            "Content-Length: ").getBytes();
+            "Content-Length: ").getBytes();*/
+    private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
+            "content-type: text/json\r\n" +
+            "connection: keep-alive\r\n" +
+            "content-length: ").getBytes();
     private byte[] bytesContent = new byte[3000];
 
     @Override
@@ -39,6 +43,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
         }
         int bytes = byteBuf.readableBytes();
         byteBuf.readBytes(bytesContent, 0, bytes);
+        //System.out.println(new String(bytesContent));
         int i = 0;
         int contentLength = 0;
         for (; i < bytes; ) {
@@ -62,8 +67,15 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
         //数据总长度
         msgToSend.writeInt(0);
         int dataLength = 0;
-        for (int start = i, eq = 0; i < bytes; i++) {
-            if (bytesContent[i] == '=') {
+        for (int start = i; i < bytes; i++) {
+            if (bytesContent[i] == '=' && bytesContent[i-1] == 'r'&& bytesContent[i-2] == 'e'){
+                start = i + 1;
+                dataLength = bytes - start + 4;
+                msgToSend.writeInt(bytes - start);
+                msgToSend.writeBytes(bytesContent,start,bytes-start);
+            }
+
+            /*if (bytesContent[i] == '=') {
                 eq = i;
             }
             if (bytesContent[i + 1] == '&' || i == bytes - 1) {
@@ -75,7 +87,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                     break;
                 }
                 start = i + 2;
-            }
+            }*/
         }
         int nowWriteIndex = msgToSend.writerIndex();
         //把总长度写进去
