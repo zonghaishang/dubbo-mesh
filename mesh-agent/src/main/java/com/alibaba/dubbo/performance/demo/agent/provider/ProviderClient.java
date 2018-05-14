@@ -74,14 +74,8 @@ public class ProviderClient {
                         client.writeAndFlush(res);
                     }
                 });
-        bootstrap.group(channelHandlerContext.channel().eventLoop());
-        try {
-            log.error("开始创建到dubbo的链接,host:{},ip:{}",dubboHost,dubboPort);
-            channelFuture = bootstrap.connect(
-                    new InetSocketAddress(dubboHost, dubboPort));
-        } catch (Exception e) {
-            log.error("创建到dubbo的连接失败", e);
-        }
+        log.error("开始创建到dubbo的链接,host:{},ip:{}",dubboHost,dubboPort);
+        channelFuture = bootstrap.group(channelHandlerContext.channel().eventLoop()).connect(new InetSocketAddress(dubboHost, dubboPort));
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {

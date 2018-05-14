@@ -32,7 +32,6 @@ elif [[ "$1" == "provider-small" ]]; then
        -Ddubbo.protocol.port=20889 \
        -Detcd.url=$ETCD_URL \
        -Dlogs.dir=/root/logs \
-       -Dnetty.server=8871 \
        -Ddubbo.application.qos.enable=false \
        -Dio.netty.leakDetectionLevel=DISABLED \
        /root/dists/mesh-agent.jar
@@ -48,7 +47,6 @@ elif [[ "$1" == "provider-medium" ]]; then
        -Ddubbo.protocol.port=20890 \
        -Detcd.url=$ETCD_URL \
        -Dlogs.dir=/root/logs \
-       -Dnetty.server=8872 \
        -Ddubbo.application.qos.enable=false \
        -Dio.netty.leakDetectionLevel=DISABLED \
        /root/dists/mesh-agent.jar
@@ -64,7 +62,6 @@ elif [[ "$1" == "provider-large" ]]; then
        -Ddubbo.protocol.port=20891 \
        -Detcd.url=$ETCD_URL \
        -Dlogs.dir=/root/logs \
-       -Dnetty.server=8873 \
        -Ddubbo.application.qos.enable=false \
        -Dio.netty.leakDetectionLevel=DISABLED \
        /root/dists/mesh-agent.jar
