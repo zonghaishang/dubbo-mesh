@@ -17,4 +17,6 @@ public class Constants {
     public static final int SEND_BUFFER_SIZE = 10 * 1024 * 1024;
     public static final int CONNECT_TIME_OUT = 100;
 
+    public static final int EVENT_LOOP_NUM = 1;
+
 }
