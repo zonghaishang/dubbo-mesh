@@ -104,7 +104,7 @@ public class ConsumerClient {
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
         byteBuf.writeInt(id);
         channelHandlerContextMap.put(id++,channelHandlerContext);
-        int port  = WeightUtil.getRandom();
+        int port  = WeightUtil.getRandom(id);
         ChannelFuture channelFuture = getChannel(port);
         if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf);

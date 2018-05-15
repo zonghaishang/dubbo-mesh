@@ -53,7 +53,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 byteBuf.resetReaderIndex();*/
 
                 int contentLength = 0;
-                byteBuf.readerIndex(33);
+                byteBuf.skipBytes(33);
                 for(;;){
                     byte b = byteBuf.readByte();
                     if(Character.isDigit(b)){
@@ -62,7 +62,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                         break;
                     }
                 }
-                int header_length = 0;
+                int header_length;
 
                 if(contentLength > 99 && contentLength < 999){
                     //3位数
@@ -75,10 +75,10 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                     header_length = 145;
                 }
 
-                if (totalLength - header_length != contentLength) {
+                /*if (totalLength - header_length != contentLength) {
                     byteBuf.resetReaderIndex();
                     return;
-                }
+                }*/
                 //前面的接口什么的都是固定的，长度136
                 int paramStart = header_length + 136;
                 int paramLength = totalLength - paramStart;
@@ -86,7 +86,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 byteBuf.readBytes(bytes,paramStart,paramLength);*/
                 //System.out.println(new String(bytes));
                 //byteBuf.readerIndex(byteBuf.readerIndex()+header_length + 136);
-                ByteBuf msgToSend = ctx.alloc().directBuffer(contentLength+8);
+                ByteBuf msgToSend = ctx.alloc().directBuffer(paramLength + 8);
                 //数据总长度
                 msgToSend.writeInt(paramLength + 4);
                 msgToSend.writeInt(paramLength );
