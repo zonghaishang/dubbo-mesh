@@ -22,17 +22,22 @@ public class ConsumerServer {
 
     public static void initConsumerAgent(){
         ServerBootstrap bootstrap = new ServerBootstrap();
+        EventLoopGroup boss = new NioEventLoopGroup(1);
         EventLoopGroup worker = new NioEventLoopGroup(8);
-        bootstrap.group(worker)
+        bootstrap.group(boss,worker)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.RECEIVE_BUFFER_SIZE))
+                .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
+                .option(ChannelOption.SO_SNDBUF, Constants.SEND_BUFFER_SIZE)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
                         ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(Constants.RECEIVE_BUFFER_SIZE));
                         ch.config().setConnectTimeoutMillis(Constants.CONNECT_TIME_OUT);
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
+                        ch.config().setReceiveBufferSize(Constants.RECEIVE_BUFFER_SIZE);
+                        ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
                         ch.pipeline().addLast(new ConsumerHandler());
                     }
                 });
