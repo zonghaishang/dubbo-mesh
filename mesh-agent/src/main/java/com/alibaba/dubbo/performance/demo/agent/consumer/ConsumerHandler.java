@@ -75,10 +75,10 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                     header_length = 145;
                 }
 
-                /*if (totalLength - header_length != contentLength) {
+                if (totalLength - header_length < contentLength) {
                     byteBuf.resetReaderIndex();
                     return;
-                }*/
+                }
                 //前面的接口什么的都是固定的，长度136
                 int paramStart = header_length + 136;
                 int paramLength = totalLength - paramStart;
