@@ -30,7 +30,6 @@ public class ProviderService {
                 .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator( Constants.RECEIVE_BUFFER_SIZE))
                 .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
-                .option(ChannelOption.SO_SNDBUF, Constants.SEND_BUFFER_SIZE)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
