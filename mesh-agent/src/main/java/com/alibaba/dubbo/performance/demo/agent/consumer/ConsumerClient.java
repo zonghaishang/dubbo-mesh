@@ -85,11 +85,11 @@ public class ConsumerClient {
                                     if(client != null){
                                         client.writeAndFlush(resByteBuf);
                                     }else {
-                                        ReferenceCountUtil.release(resByteBuf);
+                                        resByteBuf.release();
                                     }
                                 }
                             }finally {
-                                ReferenceCountUtil.release(msg);
+                                byteBuf.release();
                             }
                         }
                     }).group(channelHandlerContext.channel().eventLoop())
@@ -111,7 +111,7 @@ public class ConsumerClient {
         }else if(channelFuture!=null){
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         }else {
-            ReferenceCountUtil.release(byteBuf);
+            byteBuf.release();
             ByteBuf res = channelHandlerContext.alloc().buffer();
             res.writeBytes(HTTP_HEAD);
             res.writeByte('0'+ 0);

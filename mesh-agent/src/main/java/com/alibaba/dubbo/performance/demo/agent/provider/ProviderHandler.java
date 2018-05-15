@@ -67,7 +67,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 providerClient.send(ctx,dubboRequest,id);
             }
         }finally {
-            ReferenceCountUtil.release(msg);
+            byteBuf.release();
         }
     }
 

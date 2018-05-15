@@ -75,11 +75,11 @@ public class ProviderClient {
                                 if(client != null){
                                     client.writeAndFlush(res);
                                 }else {
-                                    ReferenceCountUtil.release(res);
+                                    res.release();
                                 }
                             }
                         }finally {
-                           ReferenceCountUtil.release(msg);
+                            byteBuf.release();
                         }
                     }
                 });
@@ -94,7 +94,7 @@ public class ProviderClient {
         } else if(channelFuture != null){
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         } else {
-            ReferenceCountUtil.release(byteBuf);
+            byteBuf.release();
             ByteBuf res = channelHandlerContext.alloc().directBuffer();
             res.writeInt(1);
             res.writeByte(1);

@@ -3,6 +3,7 @@ package com.alibaba.dubbo.performance.demo.agent.consumer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ByteProcessor;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,53 +45,59 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 if(byteBuf.readableBytes() < HTTP_HEAD.length){
                     return;
                 }
-                int bytes = byteBuf.readableBytes();
-                byteBuf.readBytes(bytesContent, 0, bytes);
-                //System.out.println(new String(bytesContent));
-                int i = 0;
+                int totalLength = byteBuf.readableBytes();
+
+                /*byteBuf.markReaderIndex();
+                byteBuf.readBytes(bytesContent,0,totalLength);
+                System.out.println(new String(bytesContent));
+                byteBuf.resetReaderIndex();*/
+
                 int contentLength = 0;
-                for (; i < bytes; ) {
-                    if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
-                        if (contentLength == 0 && match(bytesContent, i, CONTENT_LENGTH)) {
-                            for (i += CONTENT_LENGTH.length; Character.isDigit(bytesContent[i]); i++) {
-                                contentLength = contentLength * 10 + bytesContent[i] - '0';
-                            }
-                        } else if (bytesContent[i++] == '\r' && bytesContent[i++] == '\n') {
-                            break; // match body
-                        }
+                byteBuf.readerIndex(33);
+                for(;;){
+                    byte b = byteBuf.readByte();
+                    if(Character.isDigit(b)){
+                        contentLength = contentLength * 10 + b - '0';
+                    }else {
+                        break;
                     }
                 }
+                int header_length = 0;
 
-                if (bytes - i != contentLength) {
+                if(contentLength > 99 && contentLength < 999){
+                    //3位数
+                    header_length = 146;
+                }else if(contentLength > 999){
+                    //4位数
+                    header_length = 147;
+                }else {
+                    //两位数
+                    header_length = 145;
+                }
+
+                if (totalLength - header_length != contentLength) {
                     byteBuf.resetReaderIndex();
                     return;
                 }
+                //前面的接口什么的都是固定的，长度136
+                int paramStart = header_length + 136;
+                int paramLength = totalLength - paramStart;
+                /*byte[] bytes = new byte[2000];
+                byteBuf.readBytes(bytes,paramStart,paramLength);*/
+                //System.out.println(new String(bytes));
+                //byteBuf.readerIndex(byteBuf.readerIndex()+header_length + 136);
                 ByteBuf msgToSend = ctx.alloc().directBuffer(contentLength+8);
-                int dataLengthIndex = msgToSend.writerIndex();
                 //数据总长度
-                msgToSend.writeInt(0);
-                int dataLength = 4;
-                for (int start = i; i < bytes; i++) {
-                    if (bytesContent[i] == '=' && bytesContent[i-1] == 'r'&& bytesContent[i-2] == 'e'){
-                        start = i + 1;
-                        int step = bytes - start;
-                        dataLength = step + 4;
-                        msgToSend.writeInt(step);
-                        msgToSend.writeBytes(bytesContent,start,step);
-                        break;
-                    }
+                msgToSend.writeInt(paramLength + 4);
+                msgToSend.writeInt(paramLength );
+                msgToSend.writeBytes(byteBuf,paramStart,paramLength);
 
-                }
-                int nowWriteIndex = msgToSend.writerIndex();
-                //把总长度写进去
-                msgToSend.writerIndex(dataLengthIndex);
-                msgToSend.writeInt(dataLength);
-                msgToSend.writerIndex(nowWriteIndex);
+                byteBuf.skipBytes(totalLength - byteBuf.readerIndex());
 
                 consumerClient.send(ctx, msgToSend);
             }
         }finally {
-            ReferenceCountUtil.release(msg);
+            byteBuf.release();
         }
     }
 
