@@ -24,9 +24,8 @@ public class ProviderService {
     public static void initProviderAgent() throws Exception {
         new EtcdRegistry(System.getProperty(Constants.ETCE)).register(Constants.SERVER_NAME,providerServerPort);
         ServerBootstrap bootstrap = new ServerBootstrap();
-        EventLoopGroup boss = new NioEventLoopGroup(1);
-        EventLoopGroup worker = new NioEventLoopGroup(8);
-        bootstrap.group(boss,worker)
+        EventLoopGroup worker = new NioEventLoopGroup(1);
+        bootstrap.group(worker)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator( Constants.RECEIVE_BUFFER_SIZE))
