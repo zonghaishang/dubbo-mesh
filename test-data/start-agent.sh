@@ -11,6 +11,7 @@ if [[ "$1" == "consumer" ]]; then
   java -jar \
        -Xms1536M \
        -Xmx1536M \
+       -XX:MaxDirectMemorySize=2G \
        -Xss256k \
        -XX:+UseParallelOldGC \
        -Dtype=consumer \
@@ -26,6 +27,7 @@ elif [[ "$1" == "provider-small" ]]; then
        -Xms512M \
        -Xmx512M \
        -Xss256k \
+       -XX:MaxDirectMemorySize=2G \
        -XX:+UseParallelOldGC \
        -Dtype=provider \
        -Dserver.port=30000\
@@ -42,6 +44,7 @@ elif [[ "$1" == "provider-medium" ]]; then
        -Xmx1536M \
        -Xss256k \
        -XX:+UseParallelOldGC \
+       -XX:MaxDirectMemorySize=2G \
        -Dtype=provider \
        -Dserver.port=30001\
        -Ddubbo.protocol.port=20890 \
@@ -56,6 +59,7 @@ elif [[ "$1" == "provider-large" ]]; then
        -Xms2560M \
        -Xmx2560M \
        -Xss256k \
+       -XX:MaxDirectMemorySize=2G \
        -XX:+UseParallelOldGC \
        -Dtype=provider \
        -Dserver.port=30002\

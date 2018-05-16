@@ -33,13 +33,12 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf byteBuf = (ByteBuf) msg;
+
         try{
             while (byteBuf.isReadable()){
                 if(byteBuf.readableBytes() < HTTP_HEAD.length){
                     return;
                 }
-                int totalLength = byteBuf.readableBytes();
-
                 int contentLength = 0;
                 byteBuf.skipBytes(33);
                 int header_length=143;
@@ -54,14 +53,14 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 }
                 //前面的接口什么的都是固定的，长度136
                 int paramStart = header_length + 136;
-                int paramLength = totalLength - paramStart;
+                int paramLength = contentLength - 136;
                 ByteBuf msgToSend = ctx.alloc().directBuffer(paramLength + 8);
                 //数据总长度
                 msgToSend.writeInt(paramLength + 4);
                 msgToSend.writeInt(paramLength );
                 msgToSend.writeBytes(byteBuf.slice(paramStart,paramLength));
 
-                byteBuf.skipBytes(totalLength - byteBuf.readerIndex());
+                byteBuf.skipBytes(header_length + contentLength - byteBuf.readerIndex());
 
                 consumerClient.send(ctx, msgToSend);
             }
