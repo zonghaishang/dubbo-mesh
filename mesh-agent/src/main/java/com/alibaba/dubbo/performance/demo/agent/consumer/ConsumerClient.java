@@ -38,6 +38,7 @@ public class ConsumerClient {
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
     private static int HeaderLength = 8;
+    private static int zero = (int)'0';
 
 
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
@@ -70,10 +71,10 @@ public class ConsumerClient {
                                     ByteBuf resByteBuf = ctx.alloc().directBuffer();
                                     resByteBuf.writeBytes(HTTP_HEAD);
                                     if (dataLength < 10) {
-                                        resByteBuf.writeByte('0' + dataLength);
+                                        resByteBuf.writeByte(zero + dataLength);
                                     } else {
-                                        resByteBuf.writeByte('0' + dataLength / 10);
-                                        resByteBuf.writeByte('0' + dataLength % 10);
+                                        resByteBuf.writeByte(zero + dataLength / 10);
+                                        resByteBuf.writeByte(zero + dataLength % 10);
                                     }
                                     resByteBuf.writeBytes(RN_2);
 
@@ -85,11 +86,11 @@ public class ConsumerClient {
                                     if(client != null){
                                         client.writeAndFlush(resByteBuf);
                                     }else {
-                                        resByteBuf.release();
+                                        ReferenceCountUtil.release(resByteBuf);
                                     }
                                 }
                             }finally {
-                                byteBuf.release();
+                                ReferenceCountUtil.release(msg);
                             }
                         }
                     }).group(channelHandlerContext.channel().eventLoop())
@@ -111,10 +112,10 @@ public class ConsumerClient {
         }else if(channelFuture!=null){
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         }else {
-            byteBuf.release();
+            ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().buffer();
             res.writeBytes(HTTP_HEAD);
-            res.writeByte('0'+ 0);
+            res.writeByte(zero + 0);
             res.writeBytes(RN_2);
             channelHandlerContext.writeAndFlush(res);
         }
