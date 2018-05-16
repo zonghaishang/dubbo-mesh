@@ -49,7 +49,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 }
 
                 //dubboRequest encode
-                int parameterLength = byteBuf.readInt();
+                int parameterLength = allDataLength - 4;
                 byteBuf.markReaderIndex();
                 byteBuf.skipBytes(parameterLength);
                 int id = byteBuf.readInt();

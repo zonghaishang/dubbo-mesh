@@ -57,7 +57,6 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 ByteBuf msgToSend = ctx.alloc().directBuffer(paramLength + 8);
                 //数据总长度
                 msgToSend.writeInt(paramLength + 4);
-                msgToSend.writeInt(paramLength );
                 msgToSend.writeBytes(byteBuf.slice(paramStart,paramLength));
 
                 byteBuf.skipBytes(header_length + contentLength - byteBuf.readerIndex());
