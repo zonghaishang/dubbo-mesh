@@ -59,7 +59,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 //数据总长度
                 msgToSend.writeInt(paramLength + 4);
                 msgToSend.writeInt(paramLength );
-                msgToSend.writeBytes(byteBuf,paramStart,paramLength);
+                msgToSend.writeBytes(byteBuf.slice(paramStart,paramLength));
 
                 byteBuf.skipBytes(totalLength - byteBuf.readerIndex());
 
