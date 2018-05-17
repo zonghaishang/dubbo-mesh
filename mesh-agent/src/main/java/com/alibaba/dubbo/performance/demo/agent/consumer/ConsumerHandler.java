@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ConsumerHandler.class);
 
-    private static ConsumerClient consumerClient;
+    private static ThreadLocal<ConsumerClient> threadLocal = new ThreadLocal<>();
     private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
             "content-type: text/json\r\n" +
             "connection: keep-alive\r\n" +
@@ -23,10 +23,11 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
-        if (consumerClient == null) {
+        if (threadLocal.get() == null) {
             log.info("init consumerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
-            consumerClient = new ConsumerClient();
+            ConsumerClient consumerClient = new ConsumerClient();
             consumerClient.initConsumerClient(ctx);
+            threadLocal.set(consumerClient);
         }
     }
 
@@ -73,7 +74,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
 
 
                 byteBuf.skipBytes(header_length + contentLength - byteBuf.readerIndex());
-                consumerClient.send(ctx, byteBuf.slice(paramStart - 8,paramLength+8).retain());
+                threadLocal.get().send(ctx, byteBuf.slice(paramStart - 8,paramLength+8).retain());
             }
         }finally {
             ReferenceCountUtil.release(msg);

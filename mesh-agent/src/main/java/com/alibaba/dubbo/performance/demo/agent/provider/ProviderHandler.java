@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ProviderHandler.class);
-    private static ProviderClient providerClient;
+    private static ThreadLocal<ProviderClient> threadLocal = new ThreadLocal<>();;
     private static int HEADER_LENGTH = 4;
 
     protected static final byte[] STR_START_BYTES = ("\"2.0.1\"\n" +
@@ -32,10 +32,11 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelActive(ChannelHandlerContext ctx){
         dubboRequest = ctx.alloc().directBuffer(3000);
-        if (providerClient == null) {
+        if (threadLocal.get() == null) {
             log.info("init providerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
-            providerClient = new ProviderClient();
+            ProviderClient providerClient = new ProviderClient();
             providerClient.initProviderClient(ctx);
+            threadLocal.set(providerClient);
         }
     }
 
@@ -64,7 +65,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                         .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                         .writeBytes(STR_END_BYTES);
                 byteBuf.skipBytes(parameterLength);
-                providerClient.send(ctx,dubboRequest.retain(),id);
+                threadLocal.get().send(ctx,dubboRequest.retain(),id);
             }
         }finally {
             ReferenceCountUtil.release(msg);
