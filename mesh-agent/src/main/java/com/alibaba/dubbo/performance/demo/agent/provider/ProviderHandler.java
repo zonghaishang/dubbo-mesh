@@ -2,6 +2,7 @@ package com.alibaba.dubbo.performance.demo.agent.provider;
 
 import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Bytes;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
@@ -26,9 +27,11 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static final int STR_LENGTH = 173;
 
     private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    ByteBuf dubboRequest;
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
+        dubboRequest = ctx.alloc().directBuffer(3000);
         if (providerClient == null) {
             log.info("init providerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
             providerClient = new ProviderClient();
@@ -47,24 +50,21 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                     byteBuf.resetReaderIndex();
                     return;
                 }
-
+                int id = byteBuf.readInt();
                 //dubboRequest encode
                 int parameterLength = allDataLength - 4;
-                byteBuf.markReaderIndex();
-                byteBuf.skipBytes(parameterLength);
-                int id = byteBuf.readInt();
-                byteBuf.resetReaderIndex();
 
                 Bytes.long2bytes(id, header, 4);
                 Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
 
-                ByteBuf dubboRequest = ctx.alloc().directBuffer();
+                //ByteBuf dubboRequest = ctx.alloc().directBuffer();
+                dubboRequest.clear();
                 dubboRequest.writeBytes(header)
                         .writeBytes(STR_START_BYTES)
                         .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                         .writeBytes(STR_END_BYTES);
-                byteBuf.skipBytes(parameterLength + 4);
-                providerClient.send(ctx,dubboRequest,id);
+                byteBuf.skipBytes(parameterLength);
+                providerClient.send(ctx,dubboRequest.retain(),id);
             }
         }finally {
             ReferenceCountUtil.release(msg);

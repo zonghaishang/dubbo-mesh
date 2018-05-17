@@ -36,7 +36,8 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
 
         try{
             while (byteBuf.isReadable()){
-                if(byteBuf.readableBytes() < HTTP_HEAD.length){
+                int totalLength  = byteBuf.readableBytes();
+                if(totalLength < HTTP_HEAD.length){
                     return;
                 }
                 int contentLength = 0;
@@ -44,24 +45,35 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 int header_length=143;
                 for(;;){
                     byte b = byteBuf.readByte();
-                    if(Character.isDigit(b)){
+                    if(b != '\r'){
                         contentLength = contentLength * 10 + b - zero;
                         header_length++;
                     }else {
                         break;
                     }
                 }
+                if(totalLength - header_length < contentLength){
+                    byteBuf.resetReaderIndex();
+                    return;
+                }
+
                 //前面的接口什么的都是固定的，长度136
                 int paramStart = header_length + 136;
                 int paramLength = contentLength - 136;
-                ByteBuf msgToSend = ctx.alloc().directBuffer(paramLength + 8);
+                /*ByteBuf msgToSend = ctx.alloc().directBuffer(paramLength + 8);
                 //数据总长度
                 msgToSend.writeInt(paramLength + 4);
-                msgToSend.writeBytes(byteBuf.slice(paramStart,paramLength));
+                msgToSend.writeBytes(byteBuf.slice(paramStart,paramLength));*/
+
+                byteBuf.markWriterIndex();
+                byteBuf.writerIndex(paramStart - 8);
+                byteBuf.writeInt(paramLength + 4);
+                byteBuf.writeInt(0);
+                byteBuf.resetWriterIndex();
+
 
                 byteBuf.skipBytes(header_length + contentLength - byteBuf.readerIndex());
-
-                consumerClient.send(ctx, msgToSend);
+                consumerClient.send(ctx, byteBuf.slice(paramStart - 8,paramLength+8).retain());
             }
         }finally {
             ReferenceCountUtil.release(msg);

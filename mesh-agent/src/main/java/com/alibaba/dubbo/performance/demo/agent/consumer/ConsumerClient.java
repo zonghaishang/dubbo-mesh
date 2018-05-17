@@ -26,6 +26,7 @@ public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
     IntObjectMap<ChannelFuture> channelFutureMap = new IntObjectHashMap<>(128);
     IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(128);
+    ByteBuf resByteBuf;
     int id = 0;
 
     /*private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
@@ -42,6 +43,7 @@ public class ConsumerClient {
 
 
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
+        resByteBuf = channelHandlerContext.alloc().directBuffer(500);
         List<Endpoint> endpoints;
         try {
             endpoints = new EtcdRegistry(System.getProperty(Constants.ETCE))
@@ -57,6 +59,7 @@ public class ConsumerClient {
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                     .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.RECEIVE_BUFFER_SIZE))
                     .handler(new ChannelInboundHandlerAdapter() {
+
                         @Override
                         public void channelRead(ChannelHandlerContext ctx, Object msg){
                             ByteBuf byteBuf = (ByteBuf) msg;
@@ -68,7 +71,8 @@ public class ConsumerClient {
                                         return;
                                     }
                                     //结果集
-                                    ByteBuf resByteBuf = ctx.alloc().directBuffer();
+                                    //ByteBuf resByteBuf = ctx.alloc().directBuffer();
+                                    resByteBuf.clear();
                                     resByteBuf.writeBytes(HTTP_HEAD);
                                     if (dataLength < 10) {
                                         resByteBuf.writeByte(zero + dataLength);
@@ -84,9 +88,7 @@ public class ConsumerClient {
                                     int id = byteBuf.readInt();
                                     ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                                     if(client != null){
-                                        client.writeAndFlush(resByteBuf);
-                                    }else {
-                                        ReferenceCountUtil.release(resByteBuf);
+                                        client.writeAndFlush(resByteBuf.retain());
                                     }
                                 }
                             }finally {
@@ -103,17 +105,19 @@ public class ConsumerClient {
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
+        byteBuf.markWriterIndex();
+        byteBuf.writerIndex(4);
         byteBuf.writeInt(id);
+        byteBuf.resetWriterIndex();
         channelHandlerContextMap.put(id++,channelHandlerContext);
-        int port  = WeightUtil.getRandom(id);
-        ChannelFuture channelFuture = getChannel(port);
+        ChannelFuture channelFuture = getChannel( WeightUtil.getRandom(id));
         if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf);
         }else if(channelFuture!=null){
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         }else {
             ReferenceCountUtil.release(byteBuf);
-            ByteBuf res = channelHandlerContext.alloc().buffer();
+            ByteBuf res = channelHandlerContext.alloc().directBuffer();
             res.writeBytes(HTTP_HEAD);
             res.writeByte(zero + 0);
             res.writeBytes(RN_2);
