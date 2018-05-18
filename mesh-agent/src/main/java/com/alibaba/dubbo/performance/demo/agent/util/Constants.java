@@ -13,8 +13,10 @@ public class Constants {
     public static final String DUBBO_PROTOCOL_PORT = "dubbo.protocol.port";
 
 
-    public static final int RECEIVE_BUFFER_SIZE = 15* 1024;
-    public static final int SEND_BUFFER_SIZE = 15 * 1024;
+    public static final int RECEIVE_BUFFER_SIZE = 10 * 1024 * 1024;
+    public static final int SEND_BUFFER_SIZE = 10 * 1024 * 1024;
+    public static final int FIXED_RECV_BYTEBUF_ALLOCATOR = 7 * 1024;
+
     public static final int CONNECT_TIME_OUT = 200;
 
     public static final int EVENT_LOOP_NUM = 8;

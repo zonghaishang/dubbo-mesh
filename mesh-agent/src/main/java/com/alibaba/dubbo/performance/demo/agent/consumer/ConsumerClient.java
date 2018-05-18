@@ -57,7 +57,9 @@ public class ConsumerClient {
             Bootstrap bootstrap = new Bootstrap();
             channelFutureMap.put(endpoint.getPort(),bootstrap.channel(NioSocketChannel.class)
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-                    .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.RECEIVE_BUFFER_SIZE))
+                    .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
+                    .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
+                    .option(ChannelOption.SO_SNDBUF, Constants.SEND_BUFFER_SIZE)
                     .handler(new ChannelInboundHandlerAdapter() {
 
                         @Override
