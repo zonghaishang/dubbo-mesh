@@ -83,7 +83,7 @@ public class ConsumerClient {
                                     resByteBuf.writeBytes(RN_2);
 
                                     resByteBuf.writeBytes(byteBuf,byteBuf.readerIndex(),dataLength);
-                                    byteBuf.skipBytes(dataLength);
+                                    byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
 
                                     int id = byteBuf.readInt();
                                     ChannelHandlerContext client = channelHandlerContextMap.remove(id);

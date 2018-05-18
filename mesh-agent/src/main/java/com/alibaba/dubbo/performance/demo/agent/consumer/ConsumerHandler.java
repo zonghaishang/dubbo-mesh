@@ -19,7 +19,9 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
             "content-type: text/json\r\n" +
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
+    private static byte r = '\r';
     private static int zero = (int)'0';
+    byte[] lengthBytes = new byte[5];
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
@@ -39,15 +41,16 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
             while (byteBuf.isReadable()){
                 int totalLength  = byteBuf.readableBytes();
                 if(totalLength < HTTP_HEAD.length){
+                    byteBuf.resetReaderIndex();
                     return;
                 }
                 int contentLength = 0;
-                byteBuf.skipBytes(33);
+                byteBuf.readerIndex(33);
                 int header_length=143;
-                for(;;){
-                    byte b = byteBuf.readByte();
-                    if(b != '\r'){
-                        contentLength = contentLength * 10 + b - zero;
+                byteBuf.readBytes(lengthBytes);
+                for(int i=0;i<lengthBytes.length;i++){
+                    if(lengthBytes[i] != r){
+                        contentLength = contentLength * 10 + lengthBytes[i] - zero;
                         header_length++;
                     }else {
                         break;
@@ -73,7 +76,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 byteBuf.resetWriterIndex();
 
 
-                byteBuf.skipBytes(header_length + contentLength - byteBuf.readerIndex());
+                byteBuf.readerIndex(byteBuf.writerIndex());
                 threadLocal.get().send(ctx, byteBuf.slice(paramStart - 8,paramLength+8).retain());
             }
         }finally {
