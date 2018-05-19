@@ -31,7 +31,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
-        dubboRequest = ctx.alloc().directBuffer(3000);
+        dubboRequest = ctx.alloc().directBuffer(3000).writeBytes(header).writeBytes(STR_START_BYTES);
         if (threadLocal.get() == null) {
             log.info("init providerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
             ProviderClient providerClient = new ProviderClient();
@@ -64,10 +64,11 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
 
                 //ByteBuf dubboRequest = ctx.alloc().directBuffer();
-                dubboRequest.clear();
-                dubboRequest.writeBytes(header)
-                        .writeBytes(STR_START_BYTES)
-                        .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
+                dubboRequest.readerIndex(0);
+                dubboRequest.writerIndex(0);
+                dubboRequest.writeBytes(header);
+                dubboRequest.writerIndex(header.length + STR_START_BYTES.length);
+                dubboRequest.writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                         .writeBytes(STR_END_BYTES);
                 byteBuf.readerIndex(byteBuf.readerIndex() + parameterLength);
                 threadLocal.get().send(ctx,dubboRequest.retain(),id);

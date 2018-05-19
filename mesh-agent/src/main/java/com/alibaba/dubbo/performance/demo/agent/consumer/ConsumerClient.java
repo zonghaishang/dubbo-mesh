@@ -43,7 +43,7 @@ public class ConsumerClient {
 
 
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
-        resByteBuf = channelHandlerContext.alloc().directBuffer(500);
+        resByteBuf = channelHandlerContext.alloc().directBuffer(500).writeBytes(HTTP_HEAD);
         List<Endpoint> endpoints;
         try {
             endpoints = new EtcdRegistry(System.getProperty(Constants.ETCE))
@@ -74,8 +74,10 @@ public class ConsumerClient {
                                     }
                                     //结果集
                                     //ByteBuf resByteBuf = ctx.alloc().directBuffer();
-                                    resByteBuf.clear();
-                                    resByteBuf.writeBytes(HTTP_HEAD);
+                                    //resByteBuf.clear();
+                                    resByteBuf.readerIndex(0);
+                                    resByteBuf.writerIndex(HTTP_HEAD.length);
+                                    //resByteBuf.writeBytes(HTTP_HEAD);
                                     if (dataLength < 10) {
                                         resByteBuf.writeByte(zero + dataLength);
                                     } else {
