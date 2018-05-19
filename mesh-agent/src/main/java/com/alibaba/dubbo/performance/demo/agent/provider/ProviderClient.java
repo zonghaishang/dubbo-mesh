@@ -26,12 +26,18 @@ public class ProviderClient {
     public static final int HEADER_SIZE = 16;
     String dubboHost = IpHelper.getHostIp();
     int dubboPort = Integer.valueOf(System.getProperty(Constants.DUBBO_PROTOCOL_PORT));
+    ByteBuf res;
 
     public void initProviderClient(ChannelHandlerContext channelHandlerContext) {
+        if(res == null){
+            res = channelHandlerContext.alloc().directBuffer();
+        }
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.channel(NioSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
+                .option(ChannelOption.SO_SNDBUF, Constants.SEND_BUFFER_SIZE)
+                .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
                 .handler(new ChannelInboundHandlerAdapter() {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) {
@@ -42,40 +48,39 @@ public class ProviderClient {
                                     return;
                                 }
                                 byteBuf.markReaderIndex();
-                                byteBuf.skipBytes(3);
-                                byte status = byteBuf.readByte();
+                                byteBuf.readerIndex(byteBuf.readerIndex()+4);
+                                //byte status = byteBuf.readByte();
 
                                 int id = (int) byteBuf.readLong();
 
                                 int dataLength = byteBuf.readInt();
-                                if (status != 20) {
+                                /*if (status != 20) {
                                     log.error("非20结果集");
                                     byteBuf.skipBytes(dataLength);
                                     return;
-                                }
+                                }*/
 
                                 if (byteBuf.readableBytes() < dataLength) {
                                     byteBuf.resetReaderIndex();
                                     return;
                                 }
 
-                                ByteBuf res = ctx.alloc().directBuffer();
+
                                 //跳过了双引号，因此长度-3
+                                res.clear();
                                 res.writeInt(dataLength-3);
 
-                                byteBuf.skipBytes(2);
+                                byteBuf.readerIndex(byteBuf.readerIndex()+2);
                                 res.writeBytes(byteBuf, byteBuf.readerIndex(), dataLength - 3);
 
-                                byteBuf.skipBytes(dataLength - 2);
+                                byteBuf.readerIndex(byteBuf.readerIndex() + dataLength - 2);
 
                                 //System.out.println("id" + id);
                                 //System.out.println("dataLength" + dataLength);
                                 res.writeInt(id);
                                 ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                                 if(client != null){
-                                    client.writeAndFlush(res);
-                                }else {
-                                    ReferenceCountUtil.release(res);
+                                    client.writeAndFlush(res.retain());
                                 }
                             }
                         }finally {

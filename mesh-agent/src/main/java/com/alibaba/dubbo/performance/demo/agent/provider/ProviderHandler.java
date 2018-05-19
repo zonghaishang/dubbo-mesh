@@ -45,9 +45,14 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
         ByteBuf byteBuf = (ByteBuf)msg;
         try {
             while (byteBuf.isReadable()){
+                int readableBytes = byteBuf.readableBytes();
+                if(readableBytes < 4){
+                    byteBuf.resetReaderIndex();
+                    return;
+                }
                 int allDataLength = byteBuf.readInt();
                 //已经读了一个int，因此-4
-                if(byteBuf.readableBytes() < (allDataLength - 4)){
+                if(byteBuf.readableBytes() < allDataLength){
                     byteBuf.resetReaderIndex();
                     return;
                 }
@@ -64,7 +69,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                         .writeBytes(STR_START_BYTES)
                         .writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                         .writeBytes(STR_END_BYTES);
-                byteBuf.skipBytes(parameterLength);
+                byteBuf.readerIndex(byteBuf.readerIndex() + parameterLength);
                 threadLocal.get().send(ctx,dubboRequest.retain(),id);
             }
         }finally {
