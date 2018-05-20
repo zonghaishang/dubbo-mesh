@@ -22,8 +22,8 @@ public class ConsumerServer {
 
     public static void initConsumerAgent(){
         ServerBootstrap bootstrap = new ServerBootstrap();
-        EventLoopGroup worker = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
-        bootstrap.group(worker)
+        EventLoopGroup boss = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
+        bootstrap.group(boss)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
@@ -47,7 +47,7 @@ public class ConsumerServer {
         } catch (InterruptedException e) {
             log.error("创建consumer服务失败");
         }finally {
-            worker.shutdownGracefully();
+            boss.shutdownGracefully();
         }
     }
 }
