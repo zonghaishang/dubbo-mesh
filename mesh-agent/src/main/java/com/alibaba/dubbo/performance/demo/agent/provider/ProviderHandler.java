@@ -63,7 +63,6 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 Bytes.long2bytes(id, header, 4);
                 Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
 
-                //ByteBuf dubboRequest = ctx.alloc().directBuffer();
                 dubboRequest.readerIndex(0);
                 dubboRequest.writerIndex(0);
                 dubboRequest.writeBytes(header);

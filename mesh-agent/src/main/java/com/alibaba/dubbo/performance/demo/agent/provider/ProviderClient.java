@@ -100,7 +100,7 @@ public class ProviderClient {
             channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         } else {
             ReferenceCountUtil.release(byteBuf);
-            ByteBuf res = channelHandlerContext.alloc().directBuffer();
+            ByteBuf res = channelHandlerContext.alloc().directBuffer(20);
             res.writeInt(1);
             res.writeByte(1);
             res.writeInt(id);
