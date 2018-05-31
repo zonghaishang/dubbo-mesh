@@ -24,10 +24,10 @@ import java.util.List;
  */
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
-    IntObjectMap<ChannelFuture> channelFutureMap = new IntObjectHashMap<>(128);
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(128);
+    IntObjectMap<ChannelFuture> channelFutureMap = new IntObjectHashMap<>(280);
+    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(280);
     ByteBuf resByteBuf;
-    int id = 0;
+    //int id = 0;
 
     /*private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
             "Content-Type: text/json\r\n" +
@@ -106,11 +106,12 @@ public class ConsumerClient {
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
+        int id = WeightUtil.getId();
         byteBuf.markWriterIndex();
         byteBuf.writerIndex(4);
         byteBuf.writeInt(id);
         byteBuf.resetWriterIndex();
-        channelHandlerContextMap.put(id++,channelHandlerContext);
+        channelHandlerContextMap.put(id,channelHandlerContext);
         ChannelFuture channelFuture = getChannel( WeightUtil.getRandom(id));
         if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf);

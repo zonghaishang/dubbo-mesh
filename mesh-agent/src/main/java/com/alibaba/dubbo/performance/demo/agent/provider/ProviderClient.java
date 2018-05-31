@@ -21,7 +21,7 @@ import java.net.InetSocketAddress;
 public class ProviderClient {
     private static final Logger log = LoggerFactory.getLogger(ProviderClient.class);
 
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(128);
+    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(280);
     ChannelFuture channelFuture;
     public static final int HEADER_SIZE = 16;
     String dubboHost = IpHelper.getHostIp();
