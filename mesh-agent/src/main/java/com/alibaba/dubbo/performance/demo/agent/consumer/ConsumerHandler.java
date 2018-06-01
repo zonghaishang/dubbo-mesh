@@ -36,7 +36,6 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf byteBuf = (ByteBuf) msg;
-
         try{
             while (byteBuf.isReadable()){
                 int totalLength  = byteBuf.readableBytes();
@@ -69,7 +68,7 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 byteBuf.writerIndex(paramStart - 8);
                 //数据总长度
                 byteBuf.writeInt(paramLength + 4);
-                byteBuf.writeInt(0);
+                //byteBuf.writeInt(0);
                 byteBuf.resetWriterIndex();
 
 

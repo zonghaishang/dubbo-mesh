@@ -15,14 +15,12 @@ public class Constants {
     public static final String ETCE = "etcd.url";
     public static final String DUBBO_PROTOCOL_PORT = "dubbo.protocol.port";
 
-    public static final EventLoopGroup WORKER = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
-
     public static final int RECEIVE_BUFFER_SIZE = 10 * 1024 * 1024;
     public static final int SEND_BUFFER_SIZE = 10 * 1024 * 1024;
     public static final int FIXED_RECV_BYTEBUF_ALLOCATOR = 7 * 1024;
 
     public static final int CONNECT_TIME_OUT = 200;
 
-    public static final int EVENT_LOOP_NUM = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
+    public static final int EVENT_LOOP_NUM = Math.max(16, Runtime.getRuntime().availableProcessors() * 2);
 
 }
