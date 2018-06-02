@@ -89,7 +89,7 @@ public class ConsumerClient {
                                     int id = byteBuf.readInt();
                                     ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                                     if(client != null){
-                                        client.writeAndFlush(resByteBuf.retain(),channelHandlerContext.voidPromise());
+                                        client.writeAndFlush(resByteBuf.retain());
                                     }
                                 }
                             }finally {
@@ -114,16 +114,16 @@ public class ConsumerClient {
         channelHandlerContextMap.put(id,channelHandlerContext);
         ChannelFuture channelFuture = getChannel( WeightUtil.getRandom(id));
         if(channelFuture!=null && channelFuture.isDone()){
-            channelFuture.channel().writeAndFlush(byteBuf,channelHandlerContext.voidPromise());
+            channelFuture.channel().writeAndFlush(byteBuf);
         }else if(channelFuture!=null){
-            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf,channelHandlerContext.voidPromise()));
+            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
         }else {
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer();
             res.writeBytes(HTTP_HEAD);
             res.writeByte(zero + 0);
             res.writeBytes(RN_2);
-            channelHandlerContext.writeAndFlush(res,channelHandlerContext.voidPromise());
+            channelHandlerContext.writeAndFlush(res);
         }
 
     }
