@@ -21,7 +21,7 @@ import java.net.InetSocketAddress;
 public class ProviderClient {
     private static final Logger log = LoggerFactory.getLogger(ProviderClient.class);
 
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(280);
+    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap<>(2048);
     ChannelFuture channelFuture;
     public static final int HEADER_SIZE = 16;
     String dubboHost = IpHelper.getHostIp();
@@ -78,7 +78,7 @@ public class ProviderClient {
                                 //System.out.println("id" + id);
                                 //System.out.println("dataLength" + dataLength);
                                 res.writeInt(id);
-                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+                                ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
                                 if(client != null){
                                     client.writeAndFlush(res.retain());
                                 }
@@ -93,7 +93,7 @@ public class ProviderClient {
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
-        channelHandlerContextMap.put(id, channelHandlerContext);
+        channelHandlerContextMap.put(id & 1023, channelHandlerContext);
         if (channelFuture != null && channelFuture.isDone()) {
             channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise());
         } else if(channelFuture != null){
@@ -104,7 +104,7 @@ public class ProviderClient {
             res.writeInt(1);
             res.writeByte(1);
             res.writeInt(id);
-            channelHandlerContext.writeAndFlush(res,channelFuture.channel().voidPromise());
+            channelHandlerContext.writeAndFlush(res,channelHandlerContext.channel().voidPromise());
         }
     }
 }

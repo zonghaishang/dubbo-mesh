@@ -25,7 +25,7 @@ import java.util.List;
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
     IntObjectMap<ChannelFuture> channelFutureMap = new IntObjectHashMap<>(280);
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap(280);
+    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap<>(2048);
     ByteBuf resByteBuf;
     //int id = 0;
 
@@ -88,7 +88,7 @@ public class ConsumerClient {
                                     byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
 
                                     int id = byteBuf.readInt();
-                                    ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
                                     if(client != null){
                                         client.writeAndFlush(resByteBuf.retain());
                                     }
@@ -112,7 +112,7 @@ public class ConsumerClient {
         byteBuf.writerIndex(4);
         byteBuf.writeInt(id);
         byteBuf.resetWriterIndex();
-        channelHandlerContextMap.put(id,channelHandlerContext);
+        channelHandlerContextMap.put(id & 1023,channelHandlerContext);
         ChannelFuture channelFuture = getChannel( WeightUtil.getRandom(id));
         if(channelFuture!=null && channelFuture.isDone()){
             channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise());
@@ -124,7 +124,7 @@ public class ConsumerClient {
             res.writeBytes(HTTP_HEAD);
             res.writeByte(zero + 0);
             res.writeBytes(RN_2);
-            channelHandlerContext.writeAndFlush(res,channelFuture.channel().voidPromise());
+            channelHandlerContext.writeAndFlush(res,channelHandlerContext.channel().voidPromise());
         }
 
     }
