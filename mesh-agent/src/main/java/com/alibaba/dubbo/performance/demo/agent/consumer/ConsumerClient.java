@@ -42,6 +42,7 @@ public class ConsumerClient {
     private static int zero = (int)'0';
 
 
+
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
         resByteBuf = channelHandlerContext.alloc().directBuffer(500).writeBytes(HTTP_HEAD);
         List<Endpoint> endpoints;
@@ -114,16 +115,16 @@ public class ConsumerClient {
         channelHandlerContextMap.put(id,channelHandlerContext);
         ChannelFuture channelFuture = getChannel( WeightUtil.getRandom(id));
         if(channelFuture!=null && channelFuture.isDone()){
-            channelFuture.channel().writeAndFlush(byteBuf);
+            channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise());
         }else if(channelFuture!=null){
-            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
+            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise()));
         }else {
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer();
             res.writeBytes(HTTP_HEAD);
             res.writeByte(zero + 0);
             res.writeBytes(RN_2);
-            channelHandlerContext.writeAndFlush(res);
+            channelHandlerContext.writeAndFlush(res,channelFuture.channel().voidPromise());
         }
 
     }

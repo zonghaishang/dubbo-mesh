@@ -95,15 +95,16 @@ public class ProviderClient {
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
         channelHandlerContextMap.put(id, channelHandlerContext);
         if (channelFuture != null && channelFuture.isDone()) {
-            channelFuture.channel().writeAndFlush(byteBuf);
+            channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise());
         } else if(channelFuture != null){
-            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf));
+            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise()));
         } else {
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer(20);
             res.writeInt(1);
             res.writeByte(1);
             res.writeInt(id);
+            channelHandlerContext.writeAndFlush(res,channelFuture.channel().voidPromise());
         }
     }
 }
