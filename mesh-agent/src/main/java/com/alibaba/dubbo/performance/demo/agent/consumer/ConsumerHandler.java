@@ -3,8 +3,8 @@ package com.alibaba.dubbo.performance.demo.agent.consumer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.ByteProcessor;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.FastThreadLocal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 public class ConsumerHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ConsumerHandler.class);
 
-    private static ThreadLocal<ConsumerClient> threadLocal = new ThreadLocal<>();
+    private static FastThreadLocal<ConsumerClient> threadLocal = new FastThreadLocal<>();
     private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
             "content-type: text/json\r\n" +
             "connection: keep-alive\r\n" +

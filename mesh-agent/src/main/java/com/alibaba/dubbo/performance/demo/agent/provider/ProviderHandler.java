@@ -2,10 +2,10 @@ package com.alibaba.dubbo.performance.demo.agent.provider;
 
 import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Bytes;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.FastThreadLocal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ProviderHandler.class);
-    private static ThreadLocal<ProviderClient> threadLocal = new ThreadLocal<>();;
+    private static FastThreadLocal<ProviderClient> threadLocal = new FastThreadLocal<>();;
     private static int HEADER_LENGTH = 4;
 
     protected static final byte[] STR_START_BYTES = ("\"2.0.1\"\n" +
