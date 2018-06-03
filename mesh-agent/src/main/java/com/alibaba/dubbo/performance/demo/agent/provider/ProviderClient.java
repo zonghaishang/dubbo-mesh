@@ -54,11 +54,12 @@ public class ProviderClient {
                                 int id = (int) byteBuf.readLong();
 
                                 int dataLength = byteBuf.readInt();
-                                /*if (status != 20) {
+                                byte status = byteBuf.getByte(3);
+                                if (status != 20) {
                                     log.error("非20结果集");
-                                    byteBuf.skipBytes(dataLength);
+                                    byteBuf.readerIndex(byteBuf.writerIndex());
                                     return;
-                                }*/
+                                }
 
                                 if (byteBuf.readableBytes() < dataLength) {
                                     byteBuf.resetReaderIndex();
