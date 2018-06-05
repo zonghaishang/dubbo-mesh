@@ -23,7 +23,6 @@ public class ConsumerServer {
     public static void initConsumerAgent(){
         ServerBootstrap bootstrap = new ServerBootstrap();
         EventLoopGroup boss = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
-        ((NioEventLoopGroup) boss).setIoRatio(100);
         bootstrap.group(boss)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)

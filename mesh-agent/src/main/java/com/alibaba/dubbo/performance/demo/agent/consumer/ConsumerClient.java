@@ -3,6 +3,7 @@ package com.alibaba.dubbo.performance.demo.agent.consumer;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
+import com.alibaba.dubbo.performance.demo.agent.util.Util;
 import com.alibaba.dubbo.performance.demo.agent.util.WeightUtil;
 import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/12
@@ -38,10 +40,8 @@ public class ConsumerClient {
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
-    private static int HeaderLength = 8;
-    private static int zero = (int)'0';
-
-
+    private static int HeaderLength = 90;
+    private static int zero = (int) '0';
 
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
         resByteBuf = channelHandlerContext.alloc().directBuffer(500).writeBytes(HTTP_HEAD);
@@ -53,10 +53,10 @@ public class ConsumerClient {
             log.error("get etcd fail", e);
             throw new IllegalStateException(e);
         }
-        for (Endpoint endpoint : endpoints){
-            log.info("注册中心找到的endpoint host:{},port:{}",endpoint.getHost(),endpoint.getPort());
+        for (Endpoint endpoint : endpoints) {
+            log.info("注册中心找到的endpoint host:{},port:{}", endpoint.getHost(), endpoint.getPort());
             Bootstrap bootstrap = new Bootstrap();
-            channelFutureMap.put(endpoint.getPort(),bootstrap.channel(NioSocketChannel.class)
+            channelFutureMap.put(endpoint.getPort(), bootstrap.channel(NioSocketChannel.class)
                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                     .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
                     .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
@@ -64,72 +64,64 @@ public class ConsumerClient {
                     .handler(new ChannelInboundHandlerAdapter() {
 
                         @Override
-                        public void channelRead(ChannelHandlerContext ctx, Object msg){
+                        public void channelRead(ChannelHandlerContext ctx, Object msg) {
                             ByteBuf byteBuf = (ByteBuf) msg;
-                            try{
-                                while (byteBuf.readableBytes() > HeaderLength){
+                            try {
+                                while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
+                                    byteBuf.markReaderIndex();
+                                    int id = byteBuf.readInt();
                                     int dataLength = byteBuf.readInt();
-                                    if(byteBuf.readableBytes() < dataLength + 4){
+                                    int byteToSkip = dataLength < 10 ? 1 : 2;
+                                    Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(),byteBuf.readableBytes()));
+                                    if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length+ byteToSkip) {
                                         byteBuf.resetReaderIndex();
                                         return;
                                     }
+                                    //Util.printByteBuf2(byteBuf.slice(8,HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip),dataLength,id);
                                     //结果集
-                                    resByteBuf.readerIndex(0);
-                                    resByteBuf.writerIndex(HTTP_HEAD.length);
-                                    if (dataLength < 10) {
-                                        resByteBuf.writeByte(zero + dataLength);
-                                    } else {
-                                        resByteBuf.writeByte(zero + dataLength / 10);
-                                        resByteBuf.writeByte(zero + dataLength % 10);
+                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 2047);
+                                    if (client != null) {
+                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain());
                                     }
-                                    resByteBuf.writeBytes(RN_2);
-
-                                    resByteBuf.writeBytes(byteBuf,byteBuf.readerIndex(),dataLength);
-                                    byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
-
-                                    int id = byteBuf.readInt();
-                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
-                                    if(client != null){
-                                        client.writeAndFlush(resByteBuf.retain());
-                                    }
+                                    byteBuf.readerIndex(byteBuf.readerIndex()+HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
                                 }
-                            }finally {
+                            } finally {
                                 ReferenceCountUtil.release(msg);
                             }
                         }
                     }).group(channelHandlerContext.channel().eventLoop())
                     .connect(
                             new InetSocketAddress(endpoint.getHost(), endpoint.getPort())));
-            log.info("创建到provider agent的连接成功,hots:{},port:{}",endpoint.getHost(),endpoint.getPort());
-            log.info("channelFutureMap key有：{}",JSON.toJSONString(channelFutureMap.keySet()));
+            log.info("创建到provider agent的连接成功,hots:{},port:{}", endpoint.getHost(), endpoint.getPort());
+            log.info("channelFutureMap key有：{}", JSON.toJSONString(channelFutureMap.keySet()));
         }
 
     }
 
-    public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf){
+    public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) {
         int id = WeightUtil.getId();
         byteBuf.markWriterIndex();
         byteBuf.writerIndex(4);
         byteBuf.writeInt(id);
         byteBuf.resetWriterIndex();
-        channelHandlerContextMap.put(id & 1023,channelHandlerContext);
-        ChannelFuture channelFuture = getChannel( WeightUtil.getRandom(id));
-        if(channelFuture!=null && channelFuture.isDone()){
-            channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise());
-        }else if(channelFuture!=null){
-            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise()));
-        }else {
+        channelHandlerContextMap.put(id & 2047, channelHandlerContext);
+        ChannelFuture channelFuture = getChannel(WeightUtil.getRandom(id));
+        if (channelFuture != null && channelFuture.isDone()) {
+            channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
+        } else if (channelFuture != null) {
+            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise()));
+        } else {
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer();
             res.writeBytes(HTTP_HEAD);
             res.writeByte(zero + 0);
             res.writeBytes(RN_2);
-            channelHandlerContext.writeAndFlush(res,channelHandlerContext.channel().voidPromise());
+            channelHandlerContext.writeAndFlush(res, channelHandlerContext.channel().voidPromise());
         }
 
     }
 
-    public ChannelFuture getChannel(int port){
+    public ChannelFuture getChannel(int port) {
         return channelFutureMap.get(port);
     }
 }
