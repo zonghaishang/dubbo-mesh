@@ -151,12 +151,14 @@ under the License.
      | for inheritance and direct lookup purposes, and must be unique across the set of mirrors.
      |
      -->
+    <!--
     <mirror>
       <id>AlipayCenter</id>
       <mirrorOf>central</mirrorOf>
       <name>Alipay Maven Test</name>
       <url>http://mvn.test.alipay.net:8080/artifactory/repo</url>
     </mirror>
+    -->
 
     <mirror>
       <id>alimaven</id>

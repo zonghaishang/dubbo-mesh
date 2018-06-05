@@ -2,14 +2,21 @@ package com.alibaba.dubbo.performance.demo.agent.provider;
 
 import com.alibaba.dubbo.performance.demo.agent.registry.IpHelper;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
+import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.collection.IntObjectHashMap;
-import io.netty.util.collection.IntObjectMap;
+import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,15 +28,17 @@ import java.net.InetSocketAddress;
 public class ProviderClient {
     private static final Logger log = LoggerFactory.getLogger(ProviderClient.class);
 
-    IntObjectMap<ChannelHandlerContext> channelHandlerContextMap = new IntObjectHashMap<>(2048);
+    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(65536);
     ChannelFuture channelFuture;
     public static final int HEADER_SIZE = 16;
     String dubboHost = IpHelper.getHostIp();
     int dubboPort = Integer.valueOf(System.getProperty(Constants.DUBBO_PROTOCOL_PORT));
     ByteBuf res;
 
+    SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
+
     public void initProviderClient(ChannelHandlerContext channelHandlerContext) {
-        if(res == null){
+        if (res == null) {
             res = channelHandlerContext.alloc().directBuffer();
         }
         Bootstrap bootstrap = new Bootstrap();
@@ -42,20 +51,20 @@ public class ProviderClient {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) {
                         ByteBuf byteBuf = (ByteBuf) msg;
-                        try{
-                            while (byteBuf.isReadable()){
+                        try {
+                            while (byteBuf.isReadable()) {
                                 if (byteBuf.readableBytes() <= HEADER_SIZE) {
                                     return;
                                 }
                                 byteBuf.markReaderIndex();
-                                byteBuf.readerIndex(byteBuf.readerIndex()+4);
+                                byteBuf.readerIndex(byteBuf.readerIndex() + 4);
                                 //byte status = byteBuf.readByte();
 
                                 int id = (int) byteBuf.readLong();
 
                                 int dataLength = byteBuf.readInt();
                                 byte status = byteBuf.getByte(3);
-                                if (status != 20) {
+                                if (status != 20 && status != 100) {
                                     log.error("非20结果集");
                                     byteBuf.readerIndex(byteBuf.writerIndex());
                                     return;
@@ -66,12 +75,24 @@ public class ProviderClient {
                                     return;
                                 }
 
+                                // 线程池满了
+//                                if (status == 100) {
+//                                    log.error("dubbo线程池已满");
+//                                    res.clear();
+//                                    res.writeByte(status);
+//                                    byteBuf.readerIndex(byteBuf.writerIndex());
+//                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
+//                                    if (client != null) {
+//                                        client.writeAndFlush(res.retain(), client.voidPromise());
+//                                    }
+//                                    return;
+//                                }
 
                                 //跳过了双引号，因此长度-3
                                 res.clear();
-                                res.writeInt(dataLength-3);
+                                res.writeInt(dataLength - 3);
 
-                                byteBuf.readerIndex(byteBuf.readerIndex()+2);
+                                byteBuf.readerIndex(byteBuf.readerIndex() + 2);
                                 res.writeBytes(byteBuf, byteBuf.readerIndex(), dataLength - 3);
 
                                 byteBuf.readerIndex(byteBuf.readerIndex() + dataLength - 2);
@@ -80,32 +101,56 @@ public class ProviderClient {
                                 //System.out.println("dataLength" + dataLength);
                                 res.writeInt(id);
                                 ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
-                                if(client != null){
-                                    client.writeAndFlush(res.retain());
+                                if (client != null) {
+                                    client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
                             }
-                        }finally {
+                        } finally {
                             ReferenceCountUtil.release(msg);
                         }
                     }
                 });
-        log.info("开始创建到dubbo的链接,host:{},ip:{}",dubboHost,dubboPort);
+        log.info("开始创建到dubbo的链接,host:{},ip:{}", dubboHost, dubboPort);
         channelFuture = bootstrap.group(channelHandlerContext.channel().eventLoop()).connect(new InetSocketAddress(dubboHost, dubboPort));
+
+        channelFuture.addListener(new ChannelFutureListener() {
+            @Override
+            public void operationComplete(ChannelFuture future) throws Exception {
+                if (future.isSuccess()) {
+
+                    Channel ch = channelFuture.channel();
+                    ByteBuf buf = null;
+                    boolean flush = !readQueue.isEmpty();
+                    while ((buf = readQueue.poll()) != null) {
+                        if (!ch.isWritable()) {
+                            ch.flush();
+                        }
+                        ch.write(buf);
+                    }
+
+                    // Must flush at least once, even if there were no writes.
+                    if (flush)
+                        ch.flush();
+                }
+            }
+        });
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
         channelHandlerContextMap.put(id & 1023, channelHandlerContext);
-        if (channelFuture != null && channelFuture.isDone()) {
-            channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise());
-        } else if(channelFuture != null){
-            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf,channelFuture.channel().voidPromise()));
+        if (channelFuture != null && channelFuture.isSuccess()) {
+            channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
+        } else if (channelFuture != null && !channelFuture.channel().isActive()) {
+            // 消除大量listener资源消耗
+            readQueue.offer(byteBuf);
+            // channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise()));
         } else {
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer(20);
             res.writeInt(1);
             res.writeByte(1);
             res.writeInt(id);
-            channelHandlerContext.writeAndFlush(res,channelHandlerContext.channel().voidPromise());
+            channelHandlerContext.writeAndFlush(res, channelHandlerContext.channel().voidPromise());
         }
     }
 }
