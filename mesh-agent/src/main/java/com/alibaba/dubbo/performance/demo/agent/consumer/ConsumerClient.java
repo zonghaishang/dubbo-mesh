@@ -6,17 +6,10 @@ import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
 import com.alibaba.dubbo.performance.demo.agent.util.WeightUtil;
 import com.alibaba.fastjson.JSON;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.FixedRecvByteBufAllocator;
+import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
@@ -25,7 +18,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/12
@@ -81,15 +73,13 @@ public class ConsumerClient {
                                     int id = byteBuf.readInt();
                                     int dataLength = byteBuf.readInt();
                                     int byteToSkip = dataLength < 10 ? 1 : 2;
-                                    //Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(),byteBuf.readableBytes()));
                                     if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length+ byteToSkip) {
                                         byteBuf.resetReaderIndex();
                                         return;
                                     }
                                     //结果集
-                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 2047);
+                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
                                     if (client != null) {
-                                        //Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip));
                                         client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain());
                                     }
                                     byteBuf.readerIndex(byteBuf.readerIndex()+HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
@@ -135,7 +125,7 @@ public class ConsumerClient {
         byteBuf.writerIndex(4);
         byteBuf.writeInt(id);
         byteBuf.resetWriterIndex();
-        channelHandlerContextMap.put(id & 1023, channelHandlerContext);
+        channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
         ChannelFuture channelFuture = getChannel(WeightUtil.getRandom(id));
         if (channelFuture != null && channelFuture.isSuccess()) {
             channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());

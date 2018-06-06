@@ -1,8 +1,5 @@
 package com.alibaba.dubbo.performance.demo.agent.util;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-
 /**
  * @author 景竹 2018/5/12
  */
@@ -23,7 +20,9 @@ public class Constants {
 
     public static final int CONNECT_TIME_OUT = 200;
 
-    //public static final int EVENT_LOOP_NUM = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
-    public static final int EVENT_LOOP_NUM = 8;
+    public static final int MASK = 2047;
+
+    public static final int EVENT_LOOP_NUM = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
+    //public static final int EVENT_LOOP_NUM = 8;
 
 }

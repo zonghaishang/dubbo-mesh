@@ -3,17 +3,10 @@ package com.alibaba.dubbo.performance.demo.agent.provider;
 import com.alibaba.dubbo.performance.demo.agent.registry.IpHelper;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.FixedRecvByteBufAllocator;
+import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
@@ -21,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/13
@@ -40,9 +32,7 @@ public class ProviderClient {
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
-    private static int HeaderLength = 8;
     private static int zero = (int)'0';
-    private static AtomicInteger integer = new AtomicInteger(0);
 
     SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
 
@@ -68,12 +58,12 @@ public class ProviderClient {
 
                                 int id = (int) byteBuf.readLong();
                                 int dataLength = byteBuf.readInt();
-                                byte status = byteBuf.getByte(3);
+                                /*byte status = byteBuf.getByte(3);
                                 if (status != 20 && status != 100) {
                                     log.error("非20结果集");
                                     byteBuf.readerIndex(byteBuf.readerIndex()+dataLength);
                                     return;
-                                }
+                                }*/
 
                                 if (byteBuf.readableBytes() < dataLength) {
                                     byteBuf.resetReaderIndex();
@@ -120,10 +110,10 @@ public class ProviderClient {
                                 res.readBytes(bytes);
                                 System.out.println(new String(bytes));*/
 
-                                ChannelHandlerContext client = channelHandlerContextMap.get(id & 2047);
+                                ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
                                 if(client != null){
                                     //Util.printByteBuf(res.slice(8,res.writerIndex()-8));
-                                    client.writeAndFlush(res.slice(0,res.writerIndex()).retain());
+                                    client.writeAndFlush(res.retain());
                                 }
                             }
                         } finally {
@@ -158,7 +148,7 @@ public class ProviderClient {
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
-        channelHandlerContextMap.put(id & 1023, channelHandlerContext);
+        channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
             channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
         } else if (channelFuture != null && !channelFuture.channel().isActive()) {
