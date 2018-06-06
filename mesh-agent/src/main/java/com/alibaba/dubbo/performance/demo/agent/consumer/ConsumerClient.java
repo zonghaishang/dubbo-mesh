@@ -72,7 +72,7 @@ public class ConsumerClient {
                                     int id = byteBuf.readInt();
                                     int dataLength = byteBuf.readInt();
                                     int byteToSkip = dataLength < 10 ? 1 : 2;
-                                    Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(),byteBuf.readableBytes()));
+                                    //Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(),byteBuf.readableBytes()));
                                     if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length+ byteToSkip) {
                                         byteBuf.resetReaderIndex();
                                         return;
@@ -81,6 +81,7 @@ public class ConsumerClient {
                                     //结果集
                                     ChannelHandlerContext client = channelHandlerContextMap.get(id & 2047);
                                     if (client != null) {
+                                        //Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip));
                                         client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain());
                                     }
                                     byteBuf.readerIndex(byteBuf.readerIndex()+HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);

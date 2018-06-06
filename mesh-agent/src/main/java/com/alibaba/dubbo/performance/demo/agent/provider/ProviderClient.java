@@ -60,12 +60,12 @@ public class ProviderClient {
 
                                 int id = (int) byteBuf.readLong();
                                 int dataLength = byteBuf.readInt();
-                                /*byte status = byteBuf.getByte(3);
+                                byte status = byteBuf.getByte(3);
                                 if (status != 20) {
                                     log.error("非20结果集");
-                                    byteBuf.readerIndex(byteBuf.writerIndex());
+                                    byteBuf.readerIndex(byteBuf.readerIndex()+dataLength);
                                     return;
-                                }*/
+                                }
 
                                 if (byteBuf.readableBytes() < dataLength) {
                                     byteBuf.resetReaderIndex();
@@ -90,7 +90,7 @@ public class ProviderClient {
                                 //byteBuf.readerIndex(18);
                                 res.writeBytes(byteBuf, byteBuf.readerIndex()+2, dataLength-3);
 
-                                byteBuf.readerIndex(byteBuf.readerIndex() + dataLength -2);
+                                byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
 
                                 //System.out.println("id" + id);
                                 //System.out.println("dataLength" + dataLength);
