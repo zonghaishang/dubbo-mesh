@@ -7,7 +7,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author 景竹 2018/5/12
  */
 public class WeightUtil {
-    private static int[] ports = new int[]{30000, 30001, 30001, 30001, 30002, 30002, 30002, 30002};
+    //7000
+    //private static int[] ports = new int[]{30000,30000, 30001, 30001,30001, 30002, 30002,30002};
+    private static int[] ports = new int[]{
+            30000, 30000, 30000, 30000, 30000,
+            30001, 30001, 30001, 30001, 30001,
+            30002, 30002, 30002, 30002, 30002,
+    };
     //private static int[] ports = new int[]{30000};
     private static Random random = new Random();
     private static AtomicInteger atomicInteger = new AtomicInteger(0);
