@@ -60,6 +60,8 @@ public class ProviderClient {
                         try {
                             while (byteBuf.readableBytes() >= HEADER_SIZE) {
                                 byteBuf.markReaderIndex();
+
+                                byte status = byteBuf.getByte(byteBuf.readerIndex()+3);
                                 //直接跳到dubbo response读ID的位置
                                 byteBuf.readerIndex(byteBuf.readerIndex() + 4);
                                 //byte status = byteBuf.readByte();
@@ -72,24 +74,14 @@ public class ProviderClient {
                                     byteBuf.readerIndex(byteBuf.readerIndex()+dataLength);
                                     return;
                                 }*/
+                                if(status == 100){
+                                    log.error("dubbo线程池已满,id{}",id);
+                                }
 
                                 if (byteBuf.readableBytes() < dataLength) {
                                     byteBuf.resetReaderIndex();
                                     return;
                                 }
-
-                                // 线程池满了
-//                                if (status == 100) {
-//                                    log.error("dubbo线程池已满");
-//                                    res.clear();
-//                                    res.writeByte(status);
-//                                    byteBuf.readerIndex(byteBuf.writerIndex());
-//                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
-//                                    if (client != null) {
-//                                        client.writeAndFlush(res.retain(), client.voidPromise());
-//                                    }
-//                                    return;
-//                                }
 
                                 //dubbo的response是json，跳过双引号（开头2个，结尾1个），因此长度-3
                                 int httpDataLength = dataLength - 3;
