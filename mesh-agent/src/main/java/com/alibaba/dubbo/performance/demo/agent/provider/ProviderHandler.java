@@ -45,28 +45,37 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
         ByteBuf byteBuf = (ByteBuf)msg;
         try {
             while (byteBuf.isReadable()){
+                //接收到的消息格式为： 4byte（总消息长度）+ 4byte（id）+ 具体param消息
                 int readableBytes = byteBuf.readableBytes();
                 if(readableBytes < 4){
                     byteBuf.resetReaderIndex();
                     return;
                 }
                 int allDataLength = byteBuf.readInt();
-                //已经读了一个int，因此-4
+                //已经读了一个int
                 if(byteBuf.readableBytes() < allDataLength){
                     byteBuf.resetReaderIndex();
                     return;
                 }
+                //
                 int id = byteBuf.readInt();
                 //dubboRequest encode
+
+                //已经读了一个id了，因此-4，剩余为param长度
                 int parameterLength = allDataLength - 4;
 
+                //把id、param长度写到dubbo头中
                 Bytes.long2bytes(id, header, 4);
                 Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
 
+                //dubboRequest已经写好了部分东西了，直接用
                 dubboRequest.readerIndex(0);
                 dubboRequest.writerIndex(0);
+                //写入头
                 dubboRequest.writeBytes(header);
+                //跳到写param的地方
                 dubboRequest.writerIndex(header.length + STR_START_BYTES.length);
+                //写param
                 dubboRequest.writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
                         .writeBytes(STR_END_BYTES);
                 byteBuf.readerIndex(byteBuf.readerIndex() + parameterLength);

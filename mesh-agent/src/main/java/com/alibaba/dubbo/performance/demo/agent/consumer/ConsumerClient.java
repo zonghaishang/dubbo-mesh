@@ -77,16 +77,22 @@ public class ConsumerClient {
                             try {
                                 while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
                                     byteBuf.markReaderIndex();
+                                    //读id
                                     int id = byteBuf.readInt();
+                                    //读整个数据的长度
                                     int dataLength = byteBuf.readInt();
+                                    //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
                                     int byteToSkip = dataLength < 10 ? 1 : 2;
+                                    //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
                                     if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip) {
                                         byteBuf.resetReaderIndex();
                                         return;
                                     }
-                                    //结果集
+                                    //不remove，只get，map的槽位循环利用
                                     ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
                                     if (client != null) {
+                                        //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
+                                        //由于前面读了长度和id,后面就是完整的http了，直接slice返回即可
                                         client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain()
                                                 , client.voidPromise());
                                     }
@@ -130,10 +136,14 @@ public class ConsumerClient {
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) {
         int id = WeightUtil.getId();
         byteBuf.markWriterIndex();
+        //总长度在外面已经写了，直接跳到4，写id
         byteBuf.writerIndex(4);
         byteBuf.writeInt(id);
         byteBuf.resetWriterIndex();
+
+        //id & Constants.MASK 等于id取模，让map的槽位复用，都是put，不remove了
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
+
         ChannelFuture channelFuture = getChannel(WeightUtil.getRandom(id));
         if (channelFuture != null && channelFuture.isSuccess()) {
             channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());

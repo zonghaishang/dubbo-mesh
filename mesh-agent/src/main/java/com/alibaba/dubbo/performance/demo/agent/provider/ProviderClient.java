@@ -60,6 +60,7 @@ public class ProviderClient {
                         try {
                             while (byteBuf.readableBytes() >= HEADER_SIZE) {
                                 byteBuf.markReaderIndex();
+                                //直接跳到dubbo response读ID的位置
                                 byteBuf.readerIndex(byteBuf.readerIndex() + 4);
                                 //byte status = byteBuf.readByte();
 
@@ -90,36 +91,32 @@ public class ProviderClient {
 //                                    return;
 //                                }
 
-                                //跳过了双引号，因此长度-3
+                                //dubbo的response是json，跳过双引号（开头2个，结尾1个），因此长度-3
                                 int httpDataLength = dataLength - 3;
                                 res.clear();
+                                ////消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
                                 res.writeInt(id);
                                 res.writeInt(httpDataLength);
+
+                                //复用res，http头已经写好，加上id和长度，则还需要跳过8byte
                                 res.writerIndex(HTTP_HEAD.length + 8);
 
+                                //content-length 长度不定，小于10的数据占1byte，否则2byte
                                 if (httpDataLength < 10) {
                                     res.writeByte(zero + httpDataLength);
                                 } else {
                                     res.writeByte(zero + httpDataLength / 10);
                                     res.writeByte(zero + httpDataLength % 10);
                                 }
+                                //写入\r\n
                                 res.writeBytes(RN_2);
-                                //byteBuf.readerIndex(18);
-                                res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, dataLength - 3);
+                                //跳过json前面2个引号，因此+2.还要跳过屁股一个引号，因此httpDataLength = dataLength - 3
+                                res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, httpDataLength);
 
                                 byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
 
-                                //System.out.println("id" + id);
-                                //System.out.println("dataLength" + dataLength);
-                                //res.writeInt(id);
-                                /*int le = res.readableBytes();
-                                byte[] bytes = new byte[le];
-                                res.readBytes(bytes);
-                                System.out.println(new String(bytes));*/
-
                                 ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
                                 if (client != null) {
-                                    //Util.printByteBuf(res.slice(8,res.writerIndex()-8));
                                     client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
                             }
