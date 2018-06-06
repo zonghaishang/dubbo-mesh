@@ -10,9 +10,9 @@ public class WeightUtil {
     //7000
     //private static int[] ports = new int[]{30000,30000, 30001, 30001,30001, 30002, 30002,30002};
     private static int[] ports = new int[]{
-            30000, 30000, 30000, 30000,
-            30001, 30001, 30001, 30001, 30001,
-            30002, 30002, 30002, 30002, 30002,
+            30000, 30000,
+            30001, 30001, 30001,
+            30002, 30002, 30002,
     };
     //private static int[] ports = new int[]{30000};
     private static Random random = new Random();
