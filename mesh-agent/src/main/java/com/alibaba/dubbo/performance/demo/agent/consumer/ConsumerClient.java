@@ -6,10 +6,17 @@ import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
 import com.alibaba.dubbo.performance.demo.agent.util.WeightUtil;
 import com.alibaba.fastjson.JSON;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
@@ -73,16 +80,17 @@ public class ConsumerClient {
                                     int id = byteBuf.readInt();
                                     int dataLength = byteBuf.readInt();
                                     int byteToSkip = dataLength < 10 ? 1 : 2;
-                                    if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length+ byteToSkip) {
+                                    if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip) {
                                         byteBuf.resetReaderIndex();
                                         return;
                                     }
                                     //结果集
                                     ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
                                     if (client != null) {
-                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain());
+                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain()
+                                                , client.voidPromise());
                                     }
-                                    byteBuf.readerIndex(byteBuf.readerIndex()+HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
+                                    byteBuf.readerIndex(byteBuf.readerIndex() + HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
                                 }
                             } finally {
                                 ReferenceCountUtil.release(msg);
@@ -103,7 +111,7 @@ public class ConsumerClient {
                                     if (!ch.isWritable()) {
                                         ch.flush();
                                     }
-                                    ch.write(buf);
+                                    ch.write(buf, ch.voidPromise());
                                 }
 
                                 // Must flush at least once, even if there were no writes.

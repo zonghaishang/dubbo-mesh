@@ -3,10 +3,17 @@ package com.alibaba.dubbo.performance.demo.agent.provider;
 import com.alibaba.dubbo.performance.demo.agent.registry.IpHelper;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
@@ -32,12 +39,12 @@ public class ProviderClient {
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
-    private static int zero = (int)'0';
+    private static int zero = (int) '0';
 
     SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
 
     public void initProviderClient(ChannelHandlerContext channelHandlerContext) {
-        if(res == null){
+        if (res == null) {
             res = channelHandlerContext.alloc().directBuffer(512).writeInt(0).writeInt(0).writeBytes(HTTP_HEAD);
         }
         Bootstrap bootstrap = new Bootstrap();
@@ -50,8 +57,8 @@ public class ProviderClient {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) {
                         ByteBuf byteBuf = (ByteBuf) msg;
-                        try{
-                            while (byteBuf.readableBytes() >= HEADER_SIZE){
+                        try {
+                            while (byteBuf.readableBytes() >= HEADER_SIZE) {
                                 byteBuf.markReaderIndex();
                                 byteBuf.readerIndex(byteBuf.readerIndex() + 4);
                                 //byte status = byteBuf.readByte();
@@ -98,7 +105,7 @@ public class ProviderClient {
                                 }
                                 res.writeBytes(RN_2);
                                 //byteBuf.readerIndex(18);
-                                res.writeBytes(byteBuf, byteBuf.readerIndex()+2, dataLength-3);
+                                res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, dataLength - 3);
 
                                 byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
 
@@ -111,9 +118,9 @@ public class ProviderClient {
                                 System.out.println(new String(bytes));*/
 
                                 ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
-                                if(client != null){
+                                if (client != null) {
                                     //Util.printByteBuf(res.slice(8,res.writerIndex()-8));
-                                    client.writeAndFlush(res.retain());
+                                    client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
                             }
                         } finally {
@@ -136,7 +143,7 @@ public class ProviderClient {
                         if (!ch.isWritable()) {
                             ch.flush();
                         }
-                        ch.write(buf);
+                        ch.write(buf, ch.voidPromise());
                     }
 
                     // Must flush at least once, even if there were no writes.
