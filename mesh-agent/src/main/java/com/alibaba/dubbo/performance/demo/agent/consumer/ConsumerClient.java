@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/12
@@ -45,7 +46,7 @@ public class ConsumerClient {
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
-    private static int HeaderLength = 8;
+    private static int HeaderLength = 90;
     private static int zero = (int) '0';
 
     SpscLinkedQueue<ByteBuf> writeQueue = new SpscLinkedQueue<ByteBuf>();
@@ -75,31 +76,23 @@ public class ConsumerClient {
                         public void channelRead(ChannelHandlerContext ctx, Object msg) {
                             ByteBuf byteBuf = (ByteBuf) msg;
                             try {
-                                while (byteBuf.readableBytes() > HeaderLength) {
+                                while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
+                                    byteBuf.markReaderIndex();
+                                    int id = byteBuf.readInt();
                                     int dataLength = byteBuf.readInt();
-                                    if (byteBuf.readableBytes() < dataLength + 4) {
+                                    int byteToSkip = dataLength < 10 ? 1 : 2;
+                                    //Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(),byteBuf.readableBytes()));
+                                    if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length+ byteToSkip) {
                                         byteBuf.resetReaderIndex();
                                         return;
                                     }
                                     //结果集
-                                    resByteBuf.readerIndex(0);
-                                    resByteBuf.writerIndex(HTTP_HEAD.length);
-                                    if (dataLength < 10) {
-                                        resByteBuf.writeByte(zero + dataLength);
-                                    } else {
-                                        resByteBuf.writeByte(zero + dataLength / 10);
-                                        resByteBuf.writeByte(zero + dataLength % 10);
-                                    }
-                                    resByteBuf.writeBytes(RN_2);
-
-                                    resByteBuf.writeBytes(byteBuf, byteBuf.readerIndex(), dataLength);
-                                    byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
-
-                                    int id = byteBuf.readInt();
-                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
+                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & 2047);
                                     if (client != null) {
-                                        client.writeAndFlush(resByteBuf.retain(), client.voidPromise());
+                                        //Util.printByteBuf(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip));
+                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain());
                                     }
+                                    byteBuf.readerIndex(byteBuf.readerIndex()+HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
                                 }
                             } finally {
                                 ReferenceCountUtil.release(msg);

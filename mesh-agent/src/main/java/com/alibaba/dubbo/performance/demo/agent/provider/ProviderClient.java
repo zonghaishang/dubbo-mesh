@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/13
@@ -34,12 +35,20 @@ public class ProviderClient {
     String dubboHost = IpHelper.getHostIp();
     int dubboPort = Integer.valueOf(System.getProperty(Constants.DUBBO_PROTOCOL_PORT));
     ByteBuf res;
+    private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
+            "content-type: text/json\r\n" +
+            "connection: keep-alive\r\n" +
+            "content-length: ").getBytes();
+    private static byte[] RN_2 = "\r\n\n".getBytes();
+    private static int HeaderLength = 8;
+    private static int zero = (int)'0';
+    private static AtomicInteger integer = new AtomicInteger(0);
 
     SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
 
     public void initProviderClient(ChannelHandlerContext channelHandlerContext) {
-        if (res == null) {
-            res = channelHandlerContext.alloc().directBuffer();
+        if(res == null){
+            res = channelHandlerContext.alloc().directBuffer(512).writeInt(0).writeInt(0).writeBytes(HTTP_HEAD);
         }
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.channel(NioSocketChannel.class)
@@ -51,22 +60,18 @@ public class ProviderClient {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) {
                         ByteBuf byteBuf = (ByteBuf) msg;
-                        try {
-                            while (byteBuf.isReadable()) {
-                                if (byteBuf.readableBytes() <= HEADER_SIZE) {
-                                    return;
-                                }
+                        try{
+                            while (byteBuf.readableBytes() >= HEADER_SIZE){
                                 byteBuf.markReaderIndex();
                                 byteBuf.readerIndex(byteBuf.readerIndex() + 4);
                                 //byte status = byteBuf.readByte();
 
                                 int id = (int) byteBuf.readLong();
-
                                 int dataLength = byteBuf.readInt();
                                 byte status = byteBuf.getByte(3);
                                 if (status != 20 && status != 100) {
                                     log.error("非20结果集");
-                                    byteBuf.readerIndex(byteBuf.writerIndex());
+                                    byteBuf.readerIndex(byteBuf.readerIndex()+dataLength);
                                     return;
                                 }
 
@@ -89,20 +94,36 @@ public class ProviderClient {
 //                                }
 
                                 //跳过了双引号，因此长度-3
+                                int httpDataLength = dataLength - 3;
                                 res.clear();
-                                res.writeInt(dataLength - 3);
+                                res.writeInt(id);
+                                res.writeInt(httpDataLength);
+                                res.writerIndex(HTTP_HEAD.length + 8);
 
-                                byteBuf.readerIndex(byteBuf.readerIndex() + 2);
-                                res.writeBytes(byteBuf, byteBuf.readerIndex(), dataLength - 3);
+                                if (httpDataLength < 10) {
+                                    res.writeByte(zero + httpDataLength);
+                                } else {
+                                    res.writeByte(zero + httpDataLength / 10);
+                                    res.writeByte(zero + httpDataLength % 10);
+                                }
+                                res.writeBytes(RN_2);
+                                //byteBuf.readerIndex(18);
+                                res.writeBytes(byteBuf, byteBuf.readerIndex()+2, dataLength-3);
 
-                                byteBuf.readerIndex(byteBuf.readerIndex() + dataLength - 2);
+                                byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
 
                                 //System.out.println("id" + id);
                                 //System.out.println("dataLength" + dataLength);
-                                res.writeInt(id);
-                                ChannelHandlerContext client = channelHandlerContextMap.get(id & 1023);
-                                if (client != null) {
-                                    client.writeAndFlush(res.retain(), client.voidPromise());
+                                //res.writeInt(id);
+                                /*int le = res.readableBytes();
+                                byte[] bytes = new byte[le];
+                                res.readBytes(bytes);
+                                System.out.println(new String(bytes));*/
+
+                                ChannelHandlerContext client = channelHandlerContextMap.get(id & 2047);
+                                if(client != null){
+                                    //Util.printByteBuf(res.slice(8,res.writerIndex()-8));
+                                    client.writeAndFlush(res.slice(0,res.writerIndex()).retain());
                                 }
                             }
                         } finally {
