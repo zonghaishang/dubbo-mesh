@@ -30,6 +30,7 @@ public class ConsumerServer {
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
                 .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
                 .option(ChannelOption.SO_REUSEADDR, true)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Constants.CONNECT_TIME_OUT)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){

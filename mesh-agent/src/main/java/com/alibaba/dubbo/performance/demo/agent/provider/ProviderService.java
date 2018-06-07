@@ -32,11 +32,12 @@ public class ProviderService {
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator( Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
                 .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
                 .option(ChannelOption.SO_REUSEADDR, true)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Constants.CONNECT_TIME_OUT)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch){
                         ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR));
-                        //ch.config().setConnectTimeoutMillis(Constants.CONNECT_TIME_OUT);
+                        ch.config().setConnectTimeoutMillis(Constants.CONNECT_TIME_OUT);
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.config().setReceiveBufferSize(Constants.RECEIVE_BUFFER_SIZE);
                         ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
