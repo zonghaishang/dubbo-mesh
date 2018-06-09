@@ -1,5 +1,7 @@
 package com.alibaba.dubbo.performance.demo.agent.consumer;
 
+import com.alibaba.dubbo.performance.demo.agent.balance.BalanceService;
+import com.alibaba.dubbo.performance.demo.agent.balance.BalanceServiceImpl;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
@@ -47,6 +49,7 @@ public class ConsumerClient {
     private static byte[] RN_2 = "\r\n\n".getBytes();
     private static int HeaderLength = 90;
     private static int zero = (int) '0';
+    private BalanceService balanceService =new BalanceServiceImpl();
 
     SpscLinkedQueue<ByteBuf> writeQueue = new SpscLinkedQueue<ByteBuf>();
 
@@ -97,6 +100,7 @@ public class ConsumerClient {
                                                 , client.voidPromise());
                                     }
                                     byteBuf.readerIndex(byteBuf.readerIndex() + HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
+                                    balanceService.releaseCount(ctx.channel().remoteAddress());
                                 }
                             } finally {
                                 ReferenceCountUtil.release(msg);
@@ -143,14 +147,16 @@ public class ConsumerClient {
 
         //id & Constants.MASK 等于id取模，让map的槽位复用，都是put，不remove了
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
+        int port = balanceService.getRandom(id);
+        ChannelFuture channelFuture = getChannel(port);
 
-        ChannelFuture channelFuture = getChannel(WeightUtil.getRandom(id));
         if (channelFuture != null && channelFuture.isSuccess()) {
             channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
         } else if (channelFuture != null && !channelFuture.channel().isActive()) {
             writeQueue.offer(byteBuf);
 //            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise()));
         } else {
+            balanceService.releaseCount(port);
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer();
             res.writeBytes(HTTP_HEAD);
