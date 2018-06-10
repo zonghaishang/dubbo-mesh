@@ -1,6 +1,7 @@
 package com.alibaba.dubbo.performance.demo.agent.provider;
 
 import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Bytes;
+import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -29,11 +30,15 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static final int STR_LENGTH = 173;
 
     private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    ByteBuf dubboRequest;
+    ByteBuf[] dubboRequests = new ByteBuf[Constants.BATCH_SIZE];
+    int requestIndex = 0;
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
-        dubboRequest = ctx.alloc().directBuffer(3000).writeBytes(header).writeBytes(STR_START_BYTES);
+        //为什么要申请这么多块内存？因为合并请求只是write，最后才flush，为了防止bytebuf被覆盖，因此申请BatchSize多块内存空间
+        for(int i = 0;i<dubboRequests.length;i++){
+            dubboRequests[i] = ctx.alloc().directBuffer(3000).writeBytes(header).writeBytes(STR_START_BYTES);
+        }
         if (threadLocal.get() == null) {
             log.info("init providerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
             ProviderClient providerClient = new ProviderClient();
@@ -70,10 +75,9 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 //把id、param长度写到dubbo头中
                 Bytes.long2bytes(id, header, 4);
                 Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
-
+                ByteBuf dubboRequest = dubboRequests[requestIndex++ % Constants.BATCH_SIZE];
                 //dubboRequest已经写好了部分东西了，直接用
-                dubboRequest.readerIndex(0);
-                dubboRequest.writerIndex(0);
+                dubboRequest.clear();
                 //写入头
                 dubboRequest.writeBytes(header);
                 //跳到写param的地方

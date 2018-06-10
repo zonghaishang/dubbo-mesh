@@ -43,6 +43,7 @@ public class ProviderClient {
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
     private static int zero = (int) '0';
+    private int sendCount = 0;
 
     SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
 
@@ -149,7 +150,12 @@ public class ProviderClient {
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
-            channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
+            if(++sendCount < Constants.BATCH_SIZE){
+                channelFuture.channel().write(byteBuf, channelFuture.channel().voidPromise());
+            }else {
+                channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
+                sendCount = 0;
+            }
         } else {
             ReferenceCountUtil.release(byteBuf);
             res.clear();
