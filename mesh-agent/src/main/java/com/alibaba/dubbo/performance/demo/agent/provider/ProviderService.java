@@ -11,8 +11,11 @@ import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author 景竹 2018/5/12
@@ -25,8 +28,9 @@ public class ProviderService {
         new EtcdRegistry(System.getProperty(Constants.ETCE)).register(Constants.SERVER_NAME,providerServerPort);
         ServerBootstrap bootstrap = new ServerBootstrap();
         EventLoopGroup boss = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
-        ((NioEventLoopGroup) boss).setIoRatio(100);
-        bootstrap.group(boss)
+        EventLoopGroup boss0 = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
+        //((NioEventLoopGroup) boss).setIoRatio(100);
+        bootstrap.group(boss0,boss)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator( Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))

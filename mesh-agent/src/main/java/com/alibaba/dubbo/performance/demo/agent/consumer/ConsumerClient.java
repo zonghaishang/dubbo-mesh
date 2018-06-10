@@ -2,6 +2,7 @@ package com.alibaba.dubbo.performance.demo.agent.consumer;
 
 import com.alibaba.dubbo.performance.demo.agent.balance.BalanceService;
 import com.alibaba.dubbo.performance.demo.agent.balance.BalanceServiceImpl;
+import com.alibaba.dubbo.performance.demo.agent.balance.BalanceServiceNormalImpl;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
@@ -20,13 +21,16 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.FastThreadLocal;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author 景竹 2018/5/12
@@ -49,7 +53,11 @@ public class ConsumerClient {
     private static byte[] RN_2 = "\r\n\n".getBytes();
     private static int HeaderLength = 90;
     private static int zero = (int) '0';
-    private BalanceService balanceService =new BalanceServiceImpl();
+    private BalanceService balanceService =new BalanceServiceImpl() {
+    };
+    private ChannelFuture currentChannelFuture;
+    private int currentPort;
+    private int sendCounter = 0;
 
     SpscLinkedQueue<ByteBuf> writeQueue = new SpscLinkedQueue<ByteBuf>();
 
@@ -92,7 +100,9 @@ public class ConsumerClient {
                                         return;
                                     }
                                     //不remove，只get，map的槽位循环利用
-                                    ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
+                                    int index = id & Constants.MASK;
+                                    ChannelHandlerContext client = channelHandlerContextMap.get(index);
+                                    channelHandlerContextMap.put(index,null);
                                     if (client != null) {
                                         //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
                                         //由于前面读了长度和id,后面就是完整的http了，直接slice返回即可
@@ -138,7 +148,7 @@ public class ConsumerClient {
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) {
-        int id = WeightUtil.getId();
+        int id = balanceService.getId();
         byteBuf.markWriterIndex();
         //总长度在外面已经写了，直接跳到4，写id
         byteBuf.writerIndex(4);
@@ -147,16 +157,26 @@ public class ConsumerClient {
 
         //id & Constants.MASK 等于id取模，让map的槽位复用，都是put，不remove了
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
-        int port = balanceService.getRandom(id);
-        ChannelFuture channelFuture = getChannel(port);
 
-        if (channelFuture != null && channelFuture.isSuccess()) {
-            channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
-        } else if (channelFuture != null && !channelFuture.channel().isActive()) {
-            writeQueue.offer(byteBuf);
-//            channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise()));
-        } else {
-            balanceService.releaseCount(port);
+        if(currentChannelFuture == null){
+            currentPort = balanceService.getRandom(id,Constants.BATCH_SIZE);
+            currentChannelFuture = getChannel(currentPort);
+        }
+        if(currentChannelFuture != null && currentChannelFuture.isSuccess()){
+            Channel channel = currentChannelFuture.channel();
+            sendCounter++;
+            if(sendCounter < Constants.BATCH_SIZE){
+                channel.write(byteBuf,channel.voidPromise());
+            }else {
+                channel.writeAndFlush(byteBuf,channel.voidPromise());
+                currentPort = balanceService.getRandom(id,Constants.BATCH_SIZE);
+                currentChannelFuture = getChannel(currentPort);
+                //balanceService.addCount(currentPort,Constants.BATCH_SIZE);
+                sendCounter = 0;
+            }
+        }else {
+            //System.out.println("back directly");
+            //balanceService.releaseCount(currentPort);
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer();
             res.writeBytes(HTTP_HEAD);

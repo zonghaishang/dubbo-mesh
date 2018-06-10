@@ -9,6 +9,8 @@ import io.netty.util.concurrent.FastThreadLocal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * @author 景竹 2018/5/12
  */
@@ -45,6 +47,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
         ByteBuf byteBuf = (ByteBuf)msg;
         try {
             while (byteBuf.isReadable()){
+                byteBuf.markReaderIndex();
                 //接收到的消息格式为： 4byte（总消息长度）+ 4byte（id）+ 具体param消息
                 int readableBytes = byteBuf.readableBytes();
                 if(readableBytes < 4){

@@ -15,12 +15,15 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/13
@@ -147,17 +150,16 @@ public class ProviderClient {
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
             channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
-        } else if (channelFuture != null && !channelFuture.channel().isActive()) {
-            // 消除大量listener资源消耗
-            readQueue.offer(byteBuf);
-            // channelFuture.addListener(r -> channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise()));
         } else {
             ReferenceCountUtil.release(byteBuf);
-            ByteBuf res = channelHandlerContext.alloc().directBuffer(20);
-            res.writeInt(1);
-            res.writeByte(1);
+            res.clear();
             res.writeInt(id);
-            channelHandlerContext.writeAndFlush(res, channelHandlerContext.channel().voidPromise());
+            res.writeInt(1);
+            res.writerIndex(HTTP_HEAD.length + 8);
+            res.writeByte(zero + 1);
+            res.writeBytes(RN_2);
+            res.writeByte(1);
+            channelHandlerContext.writeAndFlush(res.retain(), channelHandlerContext.channel().voidPromise());
         }
     }
 }
