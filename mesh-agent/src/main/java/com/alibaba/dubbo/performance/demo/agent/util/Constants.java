@@ -12,7 +12,7 @@ public class Constants {
     public static final String ETCE = "etcd.url";
     public static final String DUBBO_PROTOCOL_PORT = "dubbo.protocol.port";
 
-    public static final int BATCH_SIZE = 2;
+    public static final int BATCH_SIZE = 4;
 
     public static final int RECEIVE_BUFFER_SIZE = 10 * 1024 * 1024;
     public static final int SEND_BUFFER_SIZE = 10 * 1024 * 1024;
