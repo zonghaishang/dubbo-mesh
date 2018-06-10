@@ -30,7 +30,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static final int STR_LENGTH = 173;
 
     private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    ByteBuf[] dubboRequests = new ByteBuf[Constants.BATCH_SIZE];
+    ByteBuf[] dubboRequests = new ByteBuf[Constants.PROVIDER_BATCH_SIZE];
     int requestIndex = 0;
 
     @Override
@@ -75,7 +75,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 //把id、param长度写到dubbo头中
                 Bytes.long2bytes(id, header, 4);
                 Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
-                ByteBuf dubboRequest = dubboRequests[requestIndex++ % Constants.BATCH_SIZE];
+                ByteBuf dubboRequest = dubboRequests[requestIndex++ % Constants.PROVIDER_BATCH_SIZE];
                 //dubboRequest已经写好了部分东西了，直接用
                 dubboRequest.clear();
                 //写入头

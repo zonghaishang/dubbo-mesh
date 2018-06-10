@@ -150,7 +150,7 @@ public class ProviderClient {
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
-            if(++sendCount < Constants.BATCH_SIZE){
+            if(++sendCount < Constants.PROVIDER_BATCH_SIZE){
                 channelFuture.channel().write(byteBuf, channelFuture.channel().voidPromise());
             }else {
                 channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
