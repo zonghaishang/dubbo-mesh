@@ -5,7 +5,10 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Arrays;
 import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 
@@ -18,6 +21,14 @@ public class BalanceServiceImpl implements BalanceService {
     private static final int MASK = 3;
     private static final int MAX_NUM = 200;
     private Random random = new Random();
+    private static final BlockingQueue<Integer> INIT_NODE_QUEUE = new ArrayBlockingQueue(32);
+    static {
+        INIT_NODE_QUEUE.addAll(Arrays.asList(
+                30000,30000,30000,30000
+                ,30001,30001,30001,30001,30001,30001
+                ,30002,30002,30002,30002,30002,30002
+        ));
+    }
 
     public static AtomicIntegerArray counter = new AtomicIntegerArray(3);
 
@@ -102,6 +113,15 @@ public class BalanceServiceImpl implements BalanceService {
     @Override
     public void addCount(int count,int port) {
         counter.addAndGet(port & MASK,count);
+    }
+
+    @Override
+    public int getInitNode(){
+        Integer port = INIT_NODE_QUEUE.poll();
+        if(port == null){
+            return 0;
+        }
+        return port;
     }
 
 }

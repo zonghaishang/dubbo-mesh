@@ -19,4 +19,6 @@ public interface BalanceService {
     void releaseCount(int port);
 
     void addCount(int count,int port);
+
+    int getInitNode();
 }

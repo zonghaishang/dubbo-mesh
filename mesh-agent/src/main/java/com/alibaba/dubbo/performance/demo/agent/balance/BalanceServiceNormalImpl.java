@@ -51,4 +51,9 @@ public class BalanceServiceNormalImpl implements BalanceService{
     public void addCount(int count,int port) {
 
     }
+
+    @Override
+    public int getInitNode() {
+        return 0;
+    }
 }

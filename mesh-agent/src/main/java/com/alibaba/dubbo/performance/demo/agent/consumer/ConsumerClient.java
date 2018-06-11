@@ -37,15 +37,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
-    InternalIntObjectHashMap<ChannelFuture> channelFutureMap = new InternalIntObjectHashMap<>(280);
+    //InternalIntObjectHashMap<ChannelFuture> channelFutureMap = new InternalIntObjectHashMap<>(280);
     InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(65536);
     ByteBuf resByteBuf;
     //int id = 0;
 
-    /*private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
-            "Content-Type: text/json\r\n" +
-            "Connection: keep-alive\r\n" +
-            "Content-Length: ").getBytes();*/
     private static byte[] HTTP_HEAD = ("HTTP/1.1 200 OK\r\n" +
             "content-type: text/json\r\n" +
             "connection: keep-alive\r\n" +
@@ -55,9 +51,8 @@ public class ConsumerClient {
     private static int zero = (int) '0';
     private BalanceService balanceService =new BalanceServiceImpl() {
     };
-    private ChannelFuture currentChannelFuture;
-    private int currentPort;
     private int sendCounter = 0;
+    private ChannelFuture channelFuture;
 
     SpscLinkedQueue<ByteBuf> writeQueue = new SpscLinkedQueue<ByteBuf>();
 
@@ -72,77 +67,83 @@ public class ConsumerClient {
             log.error("get etcd fail", e);
             throw new IllegalStateException(e);
         }
+        int initNodePort = balanceService.getInitNode();
+        if(initNodePort == 0){
+            log.error("initNodePort = 0");
+            return;
+        }
         for (Endpoint endpoint : endpoints) {
-            log.info("注册中心找到的endpoint host:{},port:{}", endpoint.getHost(), endpoint.getPort());
-            Bootstrap bootstrap = new Bootstrap();
-            channelFutureMap.put(endpoint.getPort(), bootstrap.channel(NioSocketChannel.class)
-                    .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-                    .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
-                    .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
-                    .option(ChannelOption.SO_SNDBUF, Constants.SEND_BUFFER_SIZE)
-                    .handler(new ChannelInboundHandlerAdapter() {
+            if(endpoint.getPort() == initNodePort){
+                log.info("注册中心找到的endpoint host:{},port:{}", endpoint.getHost(), endpoint.getPort());
+                Bootstrap bootstrap = new Bootstrap();
+                channelFuture =  bootstrap.channel(NioSocketChannel.class)
+                        .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+                        .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
+                        .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
+                        .option(ChannelOption.SO_SNDBUF, Constants.SEND_BUFFER_SIZE)
+                        .handler(new ChannelInboundHandlerAdapter() {
 
-                        @Override
-                        public void channelRead(ChannelHandlerContext ctx, Object msg) {
-                            ByteBuf byteBuf = (ByteBuf) msg;
-                            try {
-                                while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
-                                    byteBuf.markReaderIndex();
-                                    //读id
-                                    int id = byteBuf.readInt();
-                                    //读整个数据的长度
-                                    int dataLength = byteBuf.readInt();
-                                    //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
-                                    int byteToSkip = dataLength < 10 ? 1 : 2;
-                                    //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
-                                    if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip) {
-                                        byteBuf.resetReaderIndex();
-                                        return;
+                            @Override
+                            public void channelRead(ChannelHandlerContext ctx, Object msg) {
+                                ByteBuf byteBuf = (ByteBuf) msg;
+                                try {
+                                    while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
+                                        byteBuf.markReaderIndex();
+                                        //读id
+                                        int id = byteBuf.readInt();
+                                        //读整个数据的长度
+                                        int dataLength = byteBuf.readInt();
+                                        //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
+                                        int byteToSkip = dataLength < 10 ? 1 : 2;
+                                        //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
+                                        if (byteBuf.readableBytes() < HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip) {
+                                            byteBuf.resetReaderIndex();
+                                            return;
+                                        }
+                                        //不remove，只get，map的槽位循环利用
+                                        int index = id & Constants.MASK;
+                                        ChannelHandlerContext client = channelHandlerContextMap.get(index);
+                                        channelHandlerContextMap.put(index,null);
+                                        if (client != null) {
+                                            //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
+                                            //由于前面读了长度和id,后面就是完整的http了，直接slice返回即可
+                                            client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain()
+                                                    , client.voidPromise());
+                                        }
+                                        byteBuf.readerIndex(byteBuf.readerIndex() + HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
+                                        balanceService.releaseCount(ctx.channel().remoteAddress());
                                     }
-                                    //不remove，只get，map的槽位循环利用
-                                    int index = id & Constants.MASK;
-                                    ChannelHandlerContext client = channelHandlerContextMap.get(index);
-                                    channelHandlerContextMap.put(index,null);
-                                    if (client != null) {
-                                        //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
-                                        //由于前面读了长度和id,后面就是完整的http了，直接slice返回即可
-                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain()
-                                                , client.voidPromise());
-                                    }
-                                    byteBuf.readerIndex(byteBuf.readerIndex() + HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
-                                    balanceService.releaseCount(ctx.channel().remoteAddress());
+                                } finally {
+                                    ReferenceCountUtil.release(msg);
                                 }
-                            } finally {
-                                ReferenceCountUtil.release(msg);
                             }
-                        }
-                    }).group(channelHandlerContext.channel().eventLoop())
-                    .connect(
-                            new InetSocketAddress(endpoint.getHost(), endpoint.getPort()))
-                    .addListener(new ChannelFutureListener() {
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception {
-                            if (future.isSuccess()) {
+                        }).group(channelHandlerContext.channel().eventLoop())
+                        .connect(
+                                new InetSocketAddress(endpoint.getHost(), endpoint.getPort()))
+                        .addListener(new ChannelFutureListener() {
+                            @Override
+                            public void operationComplete(ChannelFuture future) throws Exception {
+                                if (future.isSuccess()) {
 
-                                Channel ch = future.channel();
-                                ByteBuf buf = null;
-                                boolean flush = !writeQueue.isEmpty();
-                                while ((buf = writeQueue.poll()) != null) {
-                                    if (!ch.isWritable()) {
+                                    Channel ch = future.channel();
+                                    ByteBuf buf = null;
+                                    boolean flush = !writeQueue.isEmpty();
+                                    while ((buf = writeQueue.poll()) != null) {
+                                        if (!ch.isWritable()) {
+                                            ch.flush();
+                                        }
+                                        ch.write(buf, ch.voidPromise());
+                                    }
+
+                                    // Must flush at least once, even if there were no writes.
+                                    if (flush)
                                         ch.flush();
-                                    }
-                                    ch.write(buf, ch.voidPromise());
                                 }
-
-                                // Must flush at least once, even if there were no writes.
-                                if (flush)
-                                    ch.flush();
                             }
-                        }
-                    }));
-
-            log.info("创建到provider agent的连接成功,hots:{},port:{}", endpoint.getHost(), endpoint.getPort());
-            log.info("channelFutureMap key有：{}", JSON.toJSONString(channelFutureMap.keySet()));
+                        });
+                log.info("创建到provider agent的连接成功,hots:{},port:{}", endpoint.getHost(), endpoint.getPort());
+            }
+            //log.info("channelFutureMap key有：{}", JSON.toJSONString(channelFutureMap.keySet()));
         }
 
     }
@@ -158,19 +159,12 @@ public class ConsumerClient {
         //id & Constants.MASK 等于id取模，让map的槽位复用，都是put，不remove了
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
 
-        if(currentChannelFuture == null){
-            currentPort = balanceService.getRandom(id,Constants.BATCH_SIZE);
-            currentChannelFuture = getChannel(currentPort);
-        }
-        if(currentChannelFuture != null && currentChannelFuture.isSuccess()){
-            Channel channel = currentChannelFuture.channel();
-            sendCounter++;
-            if(sendCounter < Constants.BATCH_SIZE){
+        if(channelFuture != null && channelFuture.isSuccess()){
+            Channel channel = channelFuture.channel();
+            if(++sendCounter < Constants.BATCH_SIZE){
                 channel.write(byteBuf,channel.voidPromise());
             }else {
                 channel.writeAndFlush(byteBuf,channel.voidPromise());
-                currentPort = balanceService.getRandom(id,Constants.BATCH_SIZE);
-                currentChannelFuture = getChannel(currentPort);
                 //balanceService.addCount(currentPort,Constants.BATCH_SIZE);
                 sendCounter = 0;
             }
@@ -188,6 +182,6 @@ public class ConsumerClient {
     }
 
     public ChannelFuture getChannel(int port) {
-        return channelFutureMap.get(port);
+        return channelFuture;
     }
 }
