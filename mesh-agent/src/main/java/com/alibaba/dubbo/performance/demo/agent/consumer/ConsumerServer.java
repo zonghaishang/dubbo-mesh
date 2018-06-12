@@ -10,7 +10,7 @@ import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.timeout.WriteTimeoutHandler;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +43,7 @@ public class ConsumerServer {
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.config().setReceiveBufferSize(Constants.RECEIVE_BUFFER_SIZE);
                         ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
+                        ch.pipeline().addLast(new ReadTimeoutHandler(1000,TimeUnit.MILLISECONDS));
                         ch.pipeline().addLast(new ConsumerHandler());
                     }
                 });
