@@ -65,7 +65,7 @@ public class ProviderClient {
                             while (byteBuf.readableBytes() >= HEADER_SIZE) {
                                 byteBuf.markReaderIndex();
 
-                                byte status = byteBuf.getByte(byteBuf.readerIndex()+3);
+                                byte status = byteBuf.getByte(byteBuf.readerIndex() + 3);
                                 //直接跳到dubbo response读ID的位置
                                 byteBuf.readerIndex(byteBuf.readerIndex() + 4);
                                 //byte status = byteBuf.readByte();
@@ -78,10 +78,6 @@ public class ProviderClient {
                                     byteBuf.readerIndex(byteBuf.readerIndex()+dataLength);
                                     return;
                                 }*/
-                                if(status == 100){
-                                    log.error("dubbo线程池已满,id{}",id);
-                                }
-
                                 if (byteBuf.readableBytes() < dataLength) {
                                     byteBuf.resetReaderIndex();
                                     return;
@@ -89,6 +85,14 @@ public class ProviderClient {
 
                                 //dubbo的response是json，跳过双引号（开头2个，结尾1个），因此长度-3
                                 int httpDataLength = dataLength - 3;
+
+                                if (status == 100) {
+                                    log.error("dubbo线程池已满,id{}", id);
+                                    // 如果线程池满，直接长度设置为1
+                                    httpDataLength = 1;
+                                }
+
+//                                res = resps[requestIndex++ % Constants.PROVIDER_BACK_BATCH_SIZE * 6];
                                 res.clear();
                                 ////消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
                                 res.writeInt(id);
@@ -106,8 +110,13 @@ public class ProviderClient {
                                 }
                                 //写入\r\n
                                 res.writeBytes(RN_2);
-                                //跳过json前面2个引号，因此+2.还要跳过屁股一个引号，因此httpDataLength = dataLength - 3
-                                res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, httpDataLength);
+                                if (status == 100) {
+                                    // 如果线程池满，body直接写0
+                                    res.writeByte('0');
+                                } else {
+                                    //跳过json前面2个引号，因此+2.还要跳过屁股一个引号，因此httpDataLength = dataLength - 3
+                                    res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, httpDataLength);
+                                }
 
                                 byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
 

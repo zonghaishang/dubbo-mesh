@@ -43,7 +43,7 @@ public class ConsumerServer {
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.config().setReceiveBufferSize(Constants.RECEIVE_BUFFER_SIZE);
                         ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
-                        ch.pipeline().addLast(new InternalReadTimeoutHandler(2000, TimeUnit.MILLISECONDS));
+                         ch.pipeline().addLast(new InternalReadTimeoutHandler(2000, TimeUnit.MILLISECONDS));
                         ch.pipeline().addLast(new ConsumerHandler());
                     }
                 });
