@@ -7,6 +7,7 @@ import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -42,6 +43,7 @@ public class ProviderClient {
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
+    private static final ByteBuf RN_2_BUFF = Unpooled.wrappedBuffer(RN_2);
     private static int zero = (int) '0';
     private int sendCount = 0;
 
@@ -96,35 +98,43 @@ public class ProviderClient {
 //                                res = resps[requestIndex++ % Constants.PROVIDER_BACK_BATCH_SIZE * 6];
                                 res.clear();
                                 ////消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
-                                res.writeInt(id);
-                                res.writeInt(httpDataLength);
+                                res.setInt(0,id);
+                                res.setInt(4,httpDataLength);
 
                                 //复用res，http头已经写好，加上id和长度，则还需要跳过8byte
-                                res.writerIndex(HTTP_HEAD.length + 8);
+                                //res.writerIndex(HTTP_HEAD.length + 8);
 
                                 //content-length 长度不定，小于10的数据占1byte，否则2byte
                                 if (httpDataLength < 10) {
-                                    res.writeByte(zero + httpDataLength);
+                                    res.setByte(HTTP_HEAD.length + 8,zero + httpDataLength);
+                                    res.writerIndex(HTTP_HEAD.length + 9);
                                 } else {
-                                    res.writeByte(zero + httpDataLength / 10);
-                                    res.writeByte(zero + httpDataLength % 10);
+                                    res.setByte(HTTP_HEAD.length + 8,zero + httpDataLength / 10);
+                                    res.setByte(HTTP_HEAD.length + 9,zero + httpDataLength % 10);
+                                    res.writerIndex(HTTP_HEAD.length + 10);
                                 }
                                 //写入\r\n
-                                res.writeBytes(RN_2);
+                                /*res.writeBytes(RN_2);
                                 if (status == 100) {
                                     // 如果线程池满，body直接写0
                                     res.writeByte('0');
                                 } else {
                                     //跳过json前面2个引号，因此+2.还要跳过屁股一个引号，因此httpDataLength = dataLength - 3
                                     res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, httpDataLength);
-                                }
-
-                                byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
+                                }*/
 
                                 ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
                                 if (client != null) {
-                                    client.writeAndFlush(res.retain(), client.voidPromise());
+                                    client.write(res.retain(),client.voidPromise());
+                                    client.write(RN_2_BUFF.retain(),client.voidPromise());
+                                    if (status == 100){
+                                        client.writeAndFlush('0',client.voidPromise());
+                                    }else {
+                                        client.writeAndFlush( byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
+                                    }
+                                    //client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
+                                byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
                             }
                         } finally {
                             ReferenceCountUtil.release(msg);

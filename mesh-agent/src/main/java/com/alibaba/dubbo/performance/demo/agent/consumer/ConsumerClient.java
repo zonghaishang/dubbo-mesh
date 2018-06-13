@@ -2,35 +2,22 @@ package com.alibaba.dubbo.performance.demo.agent.consumer;
 
 import com.alibaba.dubbo.performance.demo.agent.balance.BalanceService;
 import com.alibaba.dubbo.performance.demo.agent.balance.BalanceServiceImpl;
-import com.alibaba.dubbo.performance.demo.agent.balance.BalanceServiceNormalImpl;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
-import com.alibaba.dubbo.performance.demo.agent.util.WeightUtil;
-import com.alibaba.fastjson.JSON;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.FixedRecvByteBufAllocator;
+import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.concurrent.FastThreadLocal;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author 景竹 2018/5/12
@@ -111,7 +98,7 @@ public class ConsumerClient {
                                                     , client.voidPromise());
                                         }
                                         byteBuf.readerIndex(byteBuf.readerIndex() + HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
-                                        balanceService.releaseCount(ctx.channel().remoteAddress());
+                                        //balanceService.releaseCount(ctx.channel().remoteAddress());
                                     }
                                 } finally {
                                     ReferenceCountUtil.release(msg);
