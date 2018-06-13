@@ -24,7 +24,7 @@ public class Constants {
     public static final int MASK = 32767;
     public static final int PORT_MASK = 3;
 
-    //public static final int EVENT_LOOP_NUM = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
-    public static final int EVENT_LOOP_NUM = 16;
+    public static final int EVENT_LOOP_NUM = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
+    //public static final int EVENT_LOOP_NUM = 16;
 
 }

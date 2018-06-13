@@ -26,9 +26,9 @@ public class ConsumerServer {
     public static void initConsumerAgent() {
         ServerBootstrap bootstrap = new ServerBootstrap();
         EventLoopGroup boss = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
-        //EventLoopGroup boss0 = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
+        EventLoopGroup boss0 = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
         //((NioEventLoopGroup) boss).setIoRatio(100);
-        bootstrap.group(boss)
+        bootstrap.group(boss0,boss)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
@@ -43,7 +43,7 @@ public class ConsumerServer {
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.config().setReceiveBufferSize(Constants.RECEIVE_BUFFER_SIZE);
                         ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
-                         ch.pipeline().addLast(new InternalReadTimeoutHandler(2000, TimeUnit.MILLISECONDS));
+                        ch.pipeline().addLast(new InternalReadTimeoutHandler(1500, TimeUnit.MILLISECONDS));
                         ch.pipeline().addLast(new ConsumerHandler());
                     }
                 });
