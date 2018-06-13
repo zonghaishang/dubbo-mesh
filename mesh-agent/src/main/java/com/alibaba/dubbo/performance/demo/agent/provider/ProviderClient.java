@@ -167,17 +167,25 @@ public class ProviderClient {
         });
     }
 
-    public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, int id) {
+    public void send(ChannelHandlerContext channelHandlerContext, int id,ByteBuf head,ByteBuf start,ByteBuf param,ByteBuf end) {
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
+            Channel channel = channelFuture.channel();
             if(++sendCount < Constants.PROVIDER_BATCH_SIZE){
-                channelFuture.channel().write(byteBuf, channelFuture.channel().voidPromise());
+                channel.write(head.retain(), channel.voidPromise());
+                channel.write(start.retain(), channel.voidPromise());
+                channel.write(param.retain(), channel.voidPromise());
+                channel.write(end.retain(), channel.voidPromise());
             }else {
-                channelFuture.channel().writeAndFlush(byteBuf, channelFuture.channel().voidPromise());
+                channel.write(head.retain(), channel.voidPromise());
+                channel.write(start.retain(), channel.voidPromise());
+                channel.write(param.retain(), channel.voidPromise());
+                channel.writeAndFlush(end.retain(), channel.voidPromise());
                 sendCount = 0;
             }
         } else {
-            ReferenceCountUtil.release(byteBuf);
+            //ReferenceCountUtil.release(param);
+            //在handler中已经release了，这里不需要再释放
             res.clear();
             res.writeInt(id);
             res.writeInt(1);

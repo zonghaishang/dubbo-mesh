@@ -3,6 +3,7 @@ package com.alibaba.dubbo.performance.demo.agent.provider;
 import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Bytes;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
@@ -25,11 +26,14 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
             "null\n" +
             "\"hash\"\n" +
             "\"Ljava/lang/String;\"\n\"").getBytes();
+    protected static final ByteBuf STR_START_BYTES_BUF = Unpooled.wrappedBuffer(STR_START_BYTES);
     protected static final byte[] STR_END_BYTES   = "\"\n{\"path\":\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"}\n".getBytes();
+    protected static final ByteBuf STR_END_BYTES_BUF   = Unpooled.wrappedBuffer(STR_END_BYTES);
 
     private static final int STR_LENGTH = 173;
 
     private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    private ByteBuf header_buff = Unpooled.wrappedBuffer(header);
     ByteBuf[] dubboRequests = new ByteBuf[Constants.PROVIDER_BATCH_SIZE];
     int requestIndex = 0;
 
@@ -73,23 +77,29 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 int parameterLength = allDataLength - 4;
 
                 //把id、param长度写到dubbo头中
-                Bytes.long2bytes(id, header, 4);
-                Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
-                ByteBuf dubboRequest = dubboRequests[requestIndex++ % Constants.PROVIDER_BATCH_SIZE];
+                header_buff.clear();
+                header_buff.setLong(4,id);
+                //Bytes.long2bytes(id, header, 4);
+                header_buff.setInt(12,parameterLength + STR_LENGTH);
+                header_buff.writerIndex(16);
+                //Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
+                //ByteBuf dubboRequest = dubboRequests[requestIndex++ % Constants.PROVIDER_BATCH_SIZE];
                 //dubboRequest已经写好了部分东西了，直接用
-                dubboRequest.clear();
+                //dubboRequest.clear();
                 //写入头
-                dubboRequest.writeBytes(header);
+                //dubboRequest.writeBytes(header_buff);
                 //跳到写param的地方
-                dubboRequest.writerIndex(header.length + STR_START_BYTES.length);
+                //dubboRequest.writerIndex(header.length + STR_START_BYTES.length);
                 //写param
-                dubboRequest.writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
-                        .writeBytes(STR_END_BYTES);
+                //dubboRequest.writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
+                //        .writeBytes(STR_END_BYTES);
+                threadLocal.get().send(ctx,id,header_buff,STR_START_BYTES_BUF,byteBuf.slice(byteBuf.readerIndex(),parameterLength),STR_END_BYTES_BUF);
                 byteBuf.readerIndex(byteBuf.readerIndex() + parameterLength);
-                threadLocal.get().send(ctx,dubboRequest.retain(),id);
             }
         }finally {
-            ReferenceCountUtil.release(msg);
+            if(byteBuf.refCnt() != 0){
+                ReferenceCountUtil.release(msg);
+            }
         }
     }
 
