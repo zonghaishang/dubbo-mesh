@@ -16,15 +16,12 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/13
@@ -43,6 +40,10 @@ public class ProviderClient {
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
     private static byte[] RN_2 = "\r\n\n".getBytes();
+
+    public static final byte FLAG_TWOWAY = (byte) 0x40;
+    public static final byte FLAG_EVENT = (byte) 0x20;
+
     private static final ByteBuf RN_2_BUFF = Unpooled.wrappedBuffer(RN_2);
     private static int zero = (int) '0';
     private int sendCount = 0;
@@ -67,6 +68,7 @@ public class ProviderClient {
                             while (byteBuf.readableBytes() >= HEADER_SIZE) {
                                 byteBuf.markReaderIndex();
 
+                                int readerIndex = byteBuf.readerIndex();
                                 byte status = byteBuf.getByte(byteBuf.readerIndex() + 3);
                                 //直接跳到dubbo response读ID的位置
                                 byteBuf.readerIndex(byteBuf.readerIndex() + 4);
@@ -75,12 +77,27 @@ public class ProviderClient {
                                 int id = (int) byteBuf.readLong();
                                 int dataLength = byteBuf.readInt();
 
+                                // 如果是事件
+                                if ((byteBuf.getByte(readerIndex + 2) & FLAG_EVENT) != 0) {
+                                    byteBuf.setByte(readerIndex + 2, FLAG_TWOWAY | FLAG_EVENT | 6);
+                                    byteBuf.setByte(readerIndex + 3, 20);
+                                    ByteBuf hearbeat = byteBuf.slice(readerIndex, 16 + 5).retain();
+
+                                    channelFuture.channel().writeAndFlush(hearbeat, channelFuture.channel().voidPromise());
+
+                                    byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
+                                    log.error("收到心跳并响应");
+                                    return;
+                                }
+
                                 /*byte status = byteBuf.getByte(3);*/
                                 if (status != 20 && status != 100) {
                                     log.error("非20结果集, status:" + status);
-                                    byteBuf.readerIndex(byteBuf.readerIndex()+dataLength);
+
+                                    byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
                                     return;
                                 }
+
                                 if (byteBuf.readableBytes() < dataLength) {
                                     byteBuf.resetReaderIndex();
                                     return;
@@ -98,19 +115,19 @@ public class ProviderClient {
 //                                res = resps[requestIndex++ % Constants.PROVIDER_BACK_BATCH_SIZE * 6];
                                 res.clear();
                                 ////消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
-                                res.setInt(0,id);
-                                res.setInt(4,httpDataLength);
+                                res.setInt(0, id);
+                                res.setInt(4, httpDataLength);
 
                                 //复用res，http头已经写好，加上id和长度，则还需要跳过8byte
                                 //res.writerIndex(HTTP_HEAD.length + 8);
 
                                 //content-length 长度不定，小于10的数据占1byte，否则2byte
                                 if (httpDataLength < 10) {
-                                    res.setByte(HTTP_HEAD.length + 8,zero + httpDataLength);
+                                    res.setByte(HTTP_HEAD.length + 8, zero + httpDataLength);
                                     res.writerIndex(HTTP_HEAD.length + 9);
                                 } else {
-                                    res.setByte(HTTP_HEAD.length + 8,zero + httpDataLength / 10);
-                                    res.setByte(HTTP_HEAD.length + 9,zero + httpDataLength % 10);
+                                    res.setByte(HTTP_HEAD.length + 8, zero + httpDataLength / 10);
+                                    res.setByte(HTTP_HEAD.length + 9, zero + httpDataLength % 10);
                                     res.writerIndex(HTTP_HEAD.length + 10);
                                 }
                                 //写入\r\n
@@ -125,12 +142,12 @@ public class ProviderClient {
 
                                 ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
                                 if (client != null) {
-                                    client.write(res.retain(),client.voidPromise());
-                                    client.write(RN_2_BUFF.retain(),client.voidPromise());
-                                    if (status == 100){
-                                        client.writeAndFlush('0',client.voidPromise());
-                                    }else {
-                                        client.writeAndFlush( byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
+                                    client.write(res.retain(), client.voidPromise());
+                                    client.write(RN_2_BUFF.retain(), client.voidPromise());
+                                    if (status == 100) {
+                                        client.writeAndFlush('0', client.voidPromise());
+                                    } else {
+                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
                                     }
                                     //client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
@@ -167,16 +184,16 @@ public class ProviderClient {
         });
     }
 
-    public void send(ChannelHandlerContext channelHandlerContext, int id,ByteBuf head,ByteBuf start,ByteBuf param,ByteBuf end) {
+    public void send(ChannelHandlerContext channelHandlerContext, int id, ByteBuf head, ByteBuf start, ByteBuf param, ByteBuf end) {
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
             Channel channel = channelFuture.channel();
-            if(++sendCount < Constants.PROVIDER_BATCH_SIZE){
+            if (++sendCount < Constants.PROVIDER_BATCH_SIZE) {
                 channel.write(head.retain(), channel.voidPromise());
                 channel.write(start.retain(), channel.voidPromise());
                 channel.write(param.retain(), channel.voidPromise());
                 channel.write(end.retain(), channel.voidPromise());
-            }else {
+            } else {
                 channel.write(head.retain(), channel.voidPromise());
                 channel.write(start.retain(), channel.voidPromise());
                 channel.write(param.retain(), channel.voidPromise());
