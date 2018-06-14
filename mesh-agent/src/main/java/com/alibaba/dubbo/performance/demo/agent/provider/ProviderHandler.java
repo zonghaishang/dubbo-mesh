@@ -19,25 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ProviderHandler extends ChannelInboundHandlerAdapter {
     private static final Logger log = LoggerFactory.getLogger(ProviderHandler.class);
     private static FastThreadLocal<ProviderClient> threadLocal = new FastThreadLocal<>();;
-    private static int HEADER_LENGTH = 4;
-
-    protected static final byte[] STR_START_BYTES = ("\"2.0.1\"\n" +
-            "\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"\n" +
-            "null\n" +
-            "\"hash\"\n" +
-            "\"Ljava/lang/String;\"\n\"").getBytes();
-    protected static final ByteBuf STR_START_BYTES_BUF = Unpooled.wrappedBuffer(STR_START_BYTES);
-    protected static final byte[] STR_END_BYTES   = "\"\n{\"path\":\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"}\n".getBytes();
-    protected static final ByteBuf STR_END_BYTES_BUF   = Unpooled.wrappedBuffer(STR_END_BYTES);
 
     private static final int STR_LENGTH = 173;
 
-    private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    private ByteBuf header_buff = Unpooled.wrappedBuffer(header);
-
     @Override
     public void channelActive(ChannelHandlerContext ctx){
-        //为什么要申请这么多块内存？因为合并请求只是write，最后才flush，为了防止bytebuf被覆盖，因此申请BatchSize多块内存空间
         if (threadLocal.get() == null) {
             log.info("init providerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
             ProviderClient providerClient = new ProviderClient();
@@ -70,13 +56,8 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
 
                 //已经读了一个id了，因此-4，剩余为param长度
                 int parameterLength = allDataLength - 4;
-
-                //把id、param长度写到dubbo头中
-                header_buff.clear();
-                header_buff.setLong(4,id);
-                header_buff.setInt(12,parameterLength + STR_LENGTH);
-                header_buff.writerIndex(16);
-                threadLocal.get().send(ctx,id,header_buff,STR_START_BYTES_BUF,byteBuf.slice(byteBuf.readerIndex(),parameterLength),STR_END_BYTES_BUF);
+                //parameterLength + STR_LENGTH = dubbo头的长度固定+参数长度
+                threadLocal.get().send(ctx,id,parameterLength + STR_LENGTH,byteBuf.slice(byteBuf.readerIndex(),parameterLength));
                 byteBuf.readerIndex(byteBuf.readerIndex() + parameterLength);
             }
         }finally {

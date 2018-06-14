@@ -39,7 +39,16 @@ public class ProviderClient {
             "content-type: text/json\r\n" +
             "connection: keep-alive\r\n" +
             "content-length: ").getBytes();
+    protected static final byte[] STR_START_BYTES = ("\"2.0.1\"\n" +
+            "\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"\n" +
+            "null\n" +
+            "\"hash\"\n" +
+            "\"Ljava/lang/String;\"\n\"").getBytes();
+    protected static final byte[] STR_END_BYTES   = "\"\n{\"path\":\"com.alibaba.dubbo.performance.demo.provider.IHelloService\"}\n".getBytes();
+    private static byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     private static byte[] RN_2 = "\r\n\n".getBytes();
+    protected static final ByteBuf end   = Unpooled.wrappedBuffer(STR_END_BYTES);
+    private static int head_length = header.length+STR_START_BYTES.length;
 
     public static final byte FLAG_TWOWAY = (byte) 0x40;
     public static final byte FLAG_EVENT = (byte) 0x20;
@@ -47,10 +56,15 @@ public class ProviderClient {
     private static final ByteBuf RN_2_BUFF = Unpooled.wrappedBuffer(RN_2);
     private static int zero = (int) '0';
     private int sendCount = 0;
+    private ByteBuf[] dubboRequestHeaders;
 
     SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
 
     public void initProviderClient(ChannelHandlerContext channelHandlerContext) {
+        dubboRequestHeaders = new ByteBuf[Constants.PROVIDER_BATCH_SIZE];
+        for (int i = 0; i < Constants.PROVIDER_BATCH_SIZE; i++) {
+            dubboRequestHeaders[i] = channelHandlerContext.alloc().directBuffer(header.length+STR_START_BYTES.length).writeBytes(header).writeBytes(STR_START_BYTES);
+        }
         if (res == null) {
             res = channelHandlerContext.alloc().directBuffer(512).writeInt(0).writeInt(0).writeBytes(HTTP_HEAD);
         }
@@ -130,16 +144,6 @@ public class ProviderClient {
                                     res.setByte(HTTP_HEAD.length + 9, zero + httpDataLength % 10);
                                     res.writerIndex(HTTP_HEAD.length + 10);
                                 }
-                                //写入\r\n
-                                /*res.writeBytes(RN_2);
-                                if (status == 100) {
-                                    // 如果线程池满，body直接写0
-                                    res.writeByte('0');
-                                } else {
-                                    //跳过json前面2个引号，因此+2.还要跳过屁股一个引号，因此httpDataLength = dataLength - 3
-                                    res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, httpDataLength);
-                                }*/
-
                                 ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                                 if (client != null) {
                                     client.write(res.retain(), client.voidPromise());
@@ -184,18 +188,24 @@ public class ProviderClient {
         });
     }
 
-    public void send(ChannelHandlerContext channelHandlerContext, int id, ByteBuf head, ByteBuf start, ByteBuf param, ByteBuf end) {
+    public void send(ChannelHandlerContext channelHandlerContext, int id, int length, ByteBuf param) {
+        //防止头部被覆盖，因此用数组来存
+        ByteBuf head = dubboRequestHeaders[sendCount];
+        head.readerIndex(0);
+        head.writerIndex(head_length);
+        //把id、param长度写到dubbo头中
+        head.setLong(4,id);
+        head.setInt(12,length);
+
         channelHandlerContextMap.put(id, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
             Channel channel = channelFuture.channel();
             if (++sendCount < Constants.PROVIDER_BATCH_SIZE) {
                 channel.write(head.retain(), channel.voidPromise());
-                channel.write(start.retain(), channel.voidPromise());
                 channel.write(param.retain(), channel.voidPromise());
                 channel.write(end.retain(), channel.voidPromise());
             } else {
                 channel.write(head.retain(), channel.voidPromise());
-                channel.write(start.retain(), channel.voidPromise());
                 channel.write(param.retain(), channel.voidPromise());
                 channel.writeAndFlush(end.retain(), channel.voidPromise());
                 sendCount = 0;
