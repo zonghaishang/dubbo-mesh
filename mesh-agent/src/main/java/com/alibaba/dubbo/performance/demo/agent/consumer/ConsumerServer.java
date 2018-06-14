@@ -47,7 +47,7 @@ public class ConsumerServer {
                         ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
                         ch.config().setTcpNoDelay(true);
                         ch.config().setKeepAlive(true);
-                        ch.pipeline().addLast(new InternalReadTimeoutHandler(2000, TimeUnit.MILLISECONDS));
+                        //ch.pipeline().addLast(new InternalReadTimeoutHandler(2000, TimeUnit.MILLISECONDS));
                         ch.pipeline().addLast(new ConsumerHandler());
                     }
                 });
