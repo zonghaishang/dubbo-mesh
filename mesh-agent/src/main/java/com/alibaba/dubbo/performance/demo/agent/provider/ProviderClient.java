@@ -104,10 +104,8 @@ public class ProviderClient {
                                     return;
                                 }
 
-                                /*byte status = byteBuf.getByte(3);*/
                                 if (status != 20 && status != 100) {
                                     log.error("非20结果集, status:" + status);
-
                                     byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
                                     return;
                                 }
@@ -126,7 +124,6 @@ public class ProviderClient {
                                     httpDataLength = 1;
                                 }
 
-//                                res = resps[requestIndex++ % Constants.PROVIDER_BACK_BATCH_SIZE * 6];
                                 res.clear();
                                 ////消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
                                 res.setInt(0, id);
@@ -151,7 +148,15 @@ public class ProviderClient {
                                     if (status == 100) {
                                         client.writeAndFlush('0', client.voidPromise());
                                     } else {
-                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
+                                        byteBuf.markWriterIndex();
+                                        byteBuf.markReaderIndex();
+                                        byteBuf.readerIndex(byteBuf.readerIndex() + 2);
+                                        byteBuf.writerIndex(byteBuf.readerIndex() + httpDataLength);
+                                        //client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
+                                        //设置读写范围，避免slice
+                                        client.writeAndFlush(byteBuf.retain(), client.voidPromise());
+                                        byteBuf.resetWriterIndex();
+                                        byteBuf.resetReaderIndex();
                                     }
                                     //client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
