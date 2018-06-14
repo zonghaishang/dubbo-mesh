@@ -32,7 +32,7 @@ import java.util.List;
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
     //InternalIntObjectHashMap<ChannelFuture> channelFutureMap = new InternalIntObjectHashMap<>(280);
-    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>((Constants.MASK + 1) * 2);
+    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(524288);
     ByteBuf resByteBuf;
     //int id = 0;
 
@@ -95,8 +95,7 @@ public class ConsumerClient {
                                             return;
                                         }
                                         //不remove，只get，map的槽位循环利用
-                                        int index = id & Constants.MASK;
-                                        ChannelHandlerContext client = channelHandlerContextMap.get(index);
+                                        ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                                         if (client != null) {
                                             //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
                                             //由于前面读了长度和id,后面就是完整的http了，直接slice返回即可
@@ -152,7 +151,7 @@ public class ConsumerClient {
         //byteBuf.resetWriterIndex();
 
         //id & Constants.MASK 等于id取模，让map的槽位复用，都是put，不remove了
-        channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
+        channelHandlerContextMap.put(id, channelHandlerContext);
 
         if (channelFuture != null && channelFuture.isSuccess()) {
             Channel channel = channelFuture.channel();

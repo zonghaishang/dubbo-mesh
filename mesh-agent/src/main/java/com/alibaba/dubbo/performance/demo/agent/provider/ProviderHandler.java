@@ -34,15 +34,10 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
 
     private byte[] header = new byte[] {-38, -69, -58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     private ByteBuf header_buff = Unpooled.wrappedBuffer(header);
-    ByteBuf[] dubboRequests = new ByteBuf[Constants.PROVIDER_BATCH_SIZE];
-    int requestIndex = 0;
 
     @Override
     public void channelActive(ChannelHandlerContext ctx){
         //为什么要申请这么多块内存？因为合并请求只是write，最后才flush，为了防止bytebuf被覆盖，因此申请BatchSize多块内存空间
-        for(int i = 0;i<dubboRequests.length;i++){
-            dubboRequests[i] = ctx.alloc().directBuffer(3000).writeBytes(header).writeBytes(STR_START_BYTES);
-        }
         if (threadLocal.get() == null) {
             log.info("init providerClient,ctx:{},thread id:{}", ctx.channel().id(), Thread.currentThread().getId());
             ProviderClient providerClient = new ProviderClient();
@@ -79,20 +74,8 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 //把id、param长度写到dubbo头中
                 header_buff.clear();
                 header_buff.setLong(4,id);
-                //Bytes.long2bytes(id, header, 4);
                 header_buff.setInt(12,parameterLength + STR_LENGTH);
                 header_buff.writerIndex(16);
-                //Bytes.int2bytes(parameterLength + STR_LENGTH, header, 12);
-                //ByteBuf dubboRequest = dubboRequests[requestIndex++ % Constants.PROVIDER_BATCH_SIZE];
-                //dubboRequest已经写好了部分东西了，直接用
-                //dubboRequest.clear();
-                //写入头
-                //dubboRequest.writeBytes(header_buff);
-                //跳到写param的地方
-                //dubboRequest.writerIndex(header.length + STR_START_BYTES.length);
-                //写param
-                //dubboRequest.writeBytes(byteBuf,byteBuf.readerIndex(),parameterLength)
-                //        .writeBytes(STR_END_BYTES);
                 threadLocal.get().send(ctx,id,header_buff,STR_START_BYTES_BUF,byteBuf.slice(byteBuf.readerIndex(),parameterLength),STR_END_BYTES_BUF);
                 byteBuf.readerIndex(byteBuf.readerIndex() + parameterLength);
             }

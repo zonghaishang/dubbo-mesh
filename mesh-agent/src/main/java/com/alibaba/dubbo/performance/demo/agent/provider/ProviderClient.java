@@ -29,7 +29,7 @@ import java.net.InetSocketAddress;
 public class ProviderClient {
     private static final Logger log = LoggerFactory.getLogger(ProviderClient.class);
 
-    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>((Constants.MASK + 1)*2);
+    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(524288);
     ChannelFuture channelFuture;
     public static final int HEADER_SIZE = 16;
     String dubboHost = IpHelper.getHostIp();
@@ -140,7 +140,7 @@ public class ProviderClient {
                                     res.writeBytes(byteBuf, byteBuf.readerIndex() + 2, httpDataLength);
                                 }*/
 
-                                ChannelHandlerContext client = channelHandlerContextMap.get(id & Constants.MASK);
+                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
                                 if (client != null) {
                                     client.write(res.retain(), client.voidPromise());
                                     client.write(RN_2_BUFF.retain(), client.voidPromise());
@@ -185,7 +185,7 @@ public class ProviderClient {
     }
 
     public void send(ChannelHandlerContext channelHandlerContext, int id, ByteBuf head, ByteBuf start, ByteBuf param, ByteBuf end) {
-        channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
+        channelHandlerContextMap.put(id, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
             Channel channel = channelFuture.channel();
             if (++sendCount < Constants.PROVIDER_BATCH_SIZE) {
