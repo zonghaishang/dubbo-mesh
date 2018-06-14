@@ -29,7 +29,7 @@ import java.net.InetSocketAddress;
 public class ProviderClient {
     private static final Logger log = LoggerFactory.getLogger(ProviderClient.class);
 
-    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(524288);
+    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>((Constants.MASK + 1)*2);
     ChannelFuture channelFuture;
     public static final int HEADER_SIZE = 16;
     String dubboHost = IpHelper.getHostIp();

@@ -2,6 +2,8 @@ package com.alibaba.dubbo.performance.demo.agent.util;
 
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.collection.IntObjectMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.AbstractCollection;
 import java.util.AbstractSet;
@@ -19,10 +21,16 @@ import static io.netty.util.internal.MathUtil.safeFindNextPositivePowerOfTwo;
  */
 public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
 
-    /** Default initial capacity. Used if not specified in the constructor */
+    private static final Logger log = LoggerFactory.getLogger(InternalIntObjectHashMap.class);
+
+    /**
+     * Default initial capacity. Used if not specified in the constructor
+     */
     public static final int DEFAULT_CAPACITY = 8;
 
-    /** Default load factor. Used if not specified in the constructor */
+    /**
+     * Default load factor. Used if not specified in the constructor
+     */
     public static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     /**
@@ -31,10 +39,14 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
      */
     private static final Object NULL_VALUE = new Object();
 
-    /** The maximum number of elements allowed without allocating more space. */
+    /**
+     * The maximum number of elements allowed without allocating more space.
+     */
     private int maxSize;
 
-    /** The load factor for the map. Used to calculate {@link #maxSize}. */
+    /**
+     * The load factor for the map. Used to calculate {@link #maxSize}.
+     */
     private final float loadFactor;
 
     private int[] keys;
@@ -74,7 +86,7 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
 
         // Allocate the arrays.
         keys = new int[capacity];
-        @SuppressWarnings({ "unchecked", "SuspiciousArrayCast" })
+        @SuppressWarnings({"unchecked", "SuspiciousArrayCast"})
         V[] temp = (V[]) new Object[capacity];
         values = temp;
 
@@ -103,7 +115,7 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
         int startIndex = hashIndex(key);
         int index = startIndex;
 
-        for (;;) {
+        for (; ; ) {
             if (values[index] == null) {
                 // Found empty slot, use it.
                 keys[index] = key;
@@ -324,7 +336,7 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
         int startIndex = hashIndex(key);
         int index = startIndex;
 
-        for (;;) {
+        for (; ; ) {
             if (values[index] == null) {
                 // It's available, so no chance that this value exists anywhere in the map.
                 return -1;
@@ -370,10 +382,11 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
         size++;
 
         if (size > maxSize) {
-            if(keys.length == Integer.MAX_VALUE) {
+            if (keys.length == Integer.MAX_VALUE) {
                 throw new IllegalStateException("Max capacity reached at size=" + size);
             }
 
+            log.warn("触发hash扩容， 扩容前大小:" + keys.length + ", 扩容后大小：" + (keys.length << 1));
             // Double the capacity.
             rehash(keys.length << 1);
         }
@@ -444,7 +457,7 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
         V[] oldVals = values;
 
         keys = new int[newCapacity];
-        @SuppressWarnings({ "unchecked", "SuspiciousArrayCast" })
+        @SuppressWarnings({"unchecked", "SuspiciousArrayCast"})
         V[] temp = (V[]) new Object[newCapacity];
         values = temp;
 
@@ -460,7 +473,7 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
                 int oldKey = oldKeys[i];
                 int index = hashIndex(oldKey);
 
-                for (;;) {
+                for (; ; ) {
                     if (values[index] == null) {
                         keys[index] = oldKey;
                         values[index] = oldVal;
@@ -541,7 +554,7 @@ public class InternalIntObjectHashMap<V> implements IntObjectMap<V> {
         @Override
         public boolean retainAll(Collection<?> retainedKeys) {
             boolean changed = false;
-            for(Iterator<PrimitiveEntry<V>> iter = entries().iterator(); iter.hasNext(); ) {
+            for (Iterator<PrimitiveEntry<V>> iter = entries().iterator(); iter.hasNext(); ) {
                 PrimitiveEntry<V> entry = iter.next();
                 if (!retainedKeys.contains(entry.key())) {
                     changed = true;

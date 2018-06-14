@@ -6,10 +6,17 @@ import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
@@ -25,7 +32,7 @@ import java.util.List;
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
     //InternalIntObjectHashMap<ChannelFuture> channelFutureMap = new InternalIntObjectHashMap<>(280);
-    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(524288);
+    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>((Constants.MASK + 1) * 2);
     ByteBuf resByteBuf;
     //int id = 0;
 
@@ -36,7 +43,7 @@ public class ConsumerClient {
     private static byte[] RN_2 = "\r\n\n".getBytes();
     private static int HeaderLength = 90;
     private static int zero = (int) '0';
-    private BalanceService balanceService =new BalanceServiceImpl() {
+    private BalanceService balanceService = new BalanceServiceImpl() {
     };
     private int sendCounter = 0;
     private ChannelFuture channelFuture;
@@ -55,15 +62,15 @@ public class ConsumerClient {
             throw new IllegalStateException(e);
         }
         int initNodePort = balanceService.getInitNode();
-        if(initNodePort == 0){
+        if (initNodePort == 0) {
             log.error("initNodePort = 0");
             return;
         }
         for (Endpoint endpoint : endpoints) {
-            if(endpoint.getPort() == initNodePort){
+            if (endpoint.getPort() == initNodePort) {
                 log.info("注册中心找到的endpoint host:{},port:{}", endpoint.getHost(), endpoint.getPort());
                 Bootstrap bootstrap = new Bootstrap();
-                channelFuture =  bootstrap.channel(NioSocketChannel.class)
+                channelFuture = bootstrap.channel(NioSocketChannel.class)
                         .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                         .option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR))
                         .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
@@ -95,8 +102,8 @@ public class ConsumerClient {
                                             //由于前面读了长度和id,后面就是完整的http了，直接slice返回即可
                                             client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain()
                                                     , client.voidPromise());
-                                        }else {
-                                            log.error("client is null .id:{}",id);
+                                        } else {
+                                            log.error("client is null .id:{}", id);
                                         }
                                         byteBuf.readerIndex(byteBuf.readerIndex() + HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
                                         //balanceService.releaseCount(ctx.channel().remoteAddress());
@@ -140,23 +147,23 @@ public class ConsumerClient {
         int id = balanceService.getId();
         //byteBuf.markWriterIndex();
         //总长度在外面已经写了，直接跳到4，写id
-        byteBuf.setInt(4,id);
+        byteBuf.setInt(4, id);
         //byteBuf.writeInt(id);
         //byteBuf.resetWriterIndex();
 
         //id & Constants.MASK 等于id取模，让map的槽位复用，都是put，不remove了
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);
 
-        if(channelFuture != null && channelFuture.isSuccess()){
+        if (channelFuture != null && channelFuture.isSuccess()) {
             Channel channel = channelFuture.channel();
-            if(++sendCounter < Constants.BATCH_SIZE){
-                channel.write(byteBuf,channel.voidPromise());
-            }else {
-                channel.writeAndFlush(byteBuf,channel.voidPromise());
+            if (++sendCounter < Constants.BATCH_SIZE) {
+                channel.write(byteBuf, channel.voidPromise());
+            } else {
+                channel.writeAndFlush(byteBuf, channel.voidPromise());
                 //balanceService.addCount(currentPort,Constants.BATCH_SIZE);
                 sendCounter = 0;
             }
-        }else {
+        } else {
             //System.out.println("back directly");
             //balanceService.releaseCount(currentPort);
             ReferenceCountUtil.release(byteBuf);
