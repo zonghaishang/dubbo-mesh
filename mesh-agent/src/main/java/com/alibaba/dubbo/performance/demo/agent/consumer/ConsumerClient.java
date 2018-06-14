@@ -25,7 +25,7 @@ import java.util.List;
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
     //InternalIntObjectHashMap<ChannelFuture> channelFutureMap = new InternalIntObjectHashMap<>(280);
-    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(65536);
+    InternalIntObjectHashMap<ChannelHandlerContext> channelHandlerContextMap = new InternalIntObjectHashMap<>(Constants.MASK*2);
     ByteBuf resByteBuf;
     //int id = 0;
 
@@ -90,12 +90,13 @@ public class ConsumerClient {
                                         //不remove，只get，map的槽位循环利用
                                         int index = id & Constants.MASK;
                                         ChannelHandlerContext client = channelHandlerContextMap.get(index);
-                                        channelHandlerContextMap.put(index,null);
                                         if (client != null) {
                                             //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
                                             //由于前面读了长度和id,后面就是完整的http了，直接slice返回即可
                                             client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip).retain()
                                                     , client.voidPromise());
+                                        }else {
+                                            log.error("client is null .id:{}",id);
                                         }
                                         byteBuf.readerIndex(byteBuf.readerIndex() + HTTP_HEAD.length + dataLength + RN_2.length + byteToSkip);
                                         //balanceService.releaseCount(ctx.channel().remoteAddress());
@@ -137,11 +138,11 @@ public class ConsumerClient {
 
     public void send(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf) {
         int id = balanceService.getId();
-        byteBuf.markWriterIndex();
+        //byteBuf.markWriterIndex();
         //总长度在外面已经写了，直接跳到4，写id
-        byteBuf.writerIndex(4);
-        byteBuf.writeInt(id);
-        byteBuf.resetWriterIndex();
+        byteBuf.setInt(4,id);
+        //byteBuf.writeInt(id);
+        //byteBuf.resetWriterIndex();
 
         //id & Constants.MASK 等于id取模，让map的槽位复用，都是put，不remove了
         channelHandlerContextMap.put(id & Constants.MASK, channelHandlerContext);

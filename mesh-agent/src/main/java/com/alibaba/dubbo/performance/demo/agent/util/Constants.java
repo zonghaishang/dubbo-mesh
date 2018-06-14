@@ -21,7 +21,7 @@ public class Constants {
 
     public static final int CONNECT_TIME_OUT = 200;
 
-    public static final int MASK = 32767;
+    public static final int MASK = 65535;
     public static final int PORT_MASK = 3;
 
     //public static final int EVENT_LOOP_NUM = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
