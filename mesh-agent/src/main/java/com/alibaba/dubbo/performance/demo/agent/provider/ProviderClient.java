@@ -148,15 +148,15 @@ public class ProviderClient {
                                     if (status == 100) {
                                         client.writeAndFlush('0', client.voidPromise());
                                     } else {
-                                        byteBuf.markWriterIndex();
+                                        /*byteBuf.markWriterIndex();
                                         byteBuf.markReaderIndex();
                                         byteBuf.readerIndex(byteBuf.readerIndex() + 2);
-                                        byteBuf.writerIndex(byteBuf.readerIndex() + httpDataLength);
-                                        //client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
+                                        byteBuf.writerIndex(byteBuf.readerIndex() + httpDataLength);*/
+                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
                                         //设置读写范围，避免slice
-                                        client.writeAndFlush(byteBuf.retain(), client.voidPromise());
+                                        /*client.writeAndFlush(byteBuf.retain(), client.voidPromise());
                                         byteBuf.resetWriterIndex();
-                                        byteBuf.resetReaderIndex();
+                                        byteBuf.resetReaderIndex();*/
                                     }
                                     //client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
