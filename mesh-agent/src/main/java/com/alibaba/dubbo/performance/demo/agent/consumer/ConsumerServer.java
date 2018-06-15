@@ -41,9 +41,9 @@ public class ConsumerServer {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
+                        ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.config().setRecvByteBufAllocator(new FixedRecvByteBufAllocator(Constants.FIXED_RECV_BYTEBUF_ALLOCATOR));
                         ch.config().setConnectTimeoutMillis(Constants.CONNECT_TIME_OUT);
-                        ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.config().setReceiveBufferSize(Constants.RECEIVE_BUFFER_SIZE);
                         ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
 //                        ch.config().setTcpNoDelay(true);
