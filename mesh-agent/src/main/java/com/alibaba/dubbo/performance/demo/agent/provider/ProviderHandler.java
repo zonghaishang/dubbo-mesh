@@ -40,7 +40,7 @@ public class ProviderHandler extends ChannelInboundHandlerAdapter {
                 byteBuf.markReaderIndex();
                 //接收到的消息格式为： 4byte（总消息长度）+ 4byte（id）+ 具体param消息
                 int readableBytes = byteBuf.readableBytes();
-                if(readableBytes < 4){
+                if(readableBytes < 8){
                     byteBuf.resetReaderIndex();
                     return;
                 }

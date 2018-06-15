@@ -204,10 +204,9 @@ public class ProviderClient {
         //把id、param长度写到dubbo头中
         head.setLong(4,id);
         head.setInt(12,length);
-
+        log.info("num:{}",num.getAndIncrement());
         channelHandlerContextMap.put(id, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
-            log.info("num:{}",num.getAndIncrement());
             Channel channel = channelFuture.channel();
             if (++sendCount < Constants.PROVIDER_BATCH_SIZE) {
                 channel.write(head.retain(), channel.voidPromise());

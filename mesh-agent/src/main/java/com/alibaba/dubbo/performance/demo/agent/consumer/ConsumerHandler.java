@@ -73,13 +73,13 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 //整个消息的长度减去前面接口、类型等固定长度，得到param的长度
                 int paramLength = contentLength - 136;
 
-                byteBuf.markWriterIndex();
+                //byteBuf.markWriterIndex();
                 //直接复用传过来的byteBuf，param往前移动8byte，一个用于记录总长度，一个用于保存ID
-                byteBuf.writerIndex(paramStart - 8);
+                //byteBuf.writerIndex(paramStart - 8);
                 //数据总长度
-                byteBuf.writeInt(paramLength + 4);
+                byteBuf.setInt(paramStart - 8,paramLength + 4);
                 //byteBuf.writeInt(0);
-                byteBuf.resetWriterIndex();
+               // byteBuf.resetWriterIndex();
 
                 threadLocal.get().send(ctx, byteBuf.slice(paramStart - 8,paramLength+8).retain());
                 byteBuf.readerIndex(paramStart+paramLength);
