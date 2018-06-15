@@ -1,7 +1,7 @@
 # Builder container
 FROM registry.cn-hangzhou.aliyuncs.com/aliware2018/services AS builder
 
-#COPY test-data/settings.xml /opt/maven/conf
+COPY test-data/settings.xml /opt/maven/conf
 COPY . /root/workspace/agent
 WORKDIR /root/workspace/agent
 RUN set -ex && mvn clean package -Dmaven.test.skip=true

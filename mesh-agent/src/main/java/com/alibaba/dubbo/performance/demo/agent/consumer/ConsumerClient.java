@@ -18,7 +18,6 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.DecoderException;
 import io.netty.util.ReferenceCountUtil;
@@ -202,37 +201,39 @@ public class ConsumerClient {
                             }
 
                             protected void decode(ChannelHandlerContext ctx, ByteBuf byteBuf) throws Exception {
-                                int savedReaderIndex = byteBuf.readerIndex();
-                                //读id
-                                int id = byteBuf.readInt();
-                                //读整个数据的长度
-                                int dataLength = byteBuf.readInt();
-                                //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
-                                int byteToSkip = dataLength < 10 ? 1 : 2;
-                                //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
-                                if (byteBuf.readableBytes() < length + dataLength + byteToSkip) {
-                                    byteBuf.readerIndex(savedReaderIndex);
-                                    return;
-                                }
-                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
-                                int len = byteBuf.readerIndex() + length + dataLength + byteToSkip;
-                                if (client != null) {
-                                    //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
-                                    //由于前面读了长度和id,后面就是完整的http结果了，直接slice
+
+                                while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
+                                    int savedReaderIndex = byteBuf.readerIndex();
+                                    //读id
+                                    int id = byteBuf.readInt();
+                                    //读整个数据的长度
+                                    int dataLength = byteBuf.readInt();
+                                    //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
+                                    int byteToSkip = dataLength < 10 ? 1 : 2;
+                                    //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
+                                    if (byteBuf.readableBytes() < length + dataLength + byteToSkip) {
+                                        byteBuf.readerIndex(savedReaderIndex);
+                                        return;
+                                    }
+                                    ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+                                    int len = byteBuf.readerIndex() + length + dataLength + byteToSkip;
+                                    if (client != null) {
+                                        //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
+                                        //由于前面读了长度和id,后面就是完整的http结果了，直接slice
 //                                    client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), length + dataLength + byteToSkip).retain()
 //                                            , client.voidPromise());
 
-                                    //设置读写范围，这样可以避免slice
-                                    byteBuf.markWriterIndex();
-                                    byteBuf.writerIndex(len);
+                                        //设置读写范围，这样可以避免slice
+                                        byteBuf.markWriterIndex();
+                                        byteBuf.writerIndex(len);
 
-                                    client.writeAndFlush(byteBuf.retain(), client.voidPromise());
-                                    byteBuf.resetWriterIndex();
-                                } else {
-                                    log.error("client is null .id:{}", id);
+                                        client.writeAndFlush(byteBuf.retain(), client.voidPromise());
+                                        byteBuf.resetWriterIndex();
+                                    } else {
+                                        log.error("client is null .id:{}", id);
+                                    }
+                                    byteBuf.readerIndex(len);
                                 }
-                                byteBuf.readerIndex(len);
-
                             }
 
                             @Override
