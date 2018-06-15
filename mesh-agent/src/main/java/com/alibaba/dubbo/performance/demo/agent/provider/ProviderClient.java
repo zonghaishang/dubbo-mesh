@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/13
@@ -57,6 +58,8 @@ public class ProviderClient {
     private static int zero = (int) '0';
     private int sendCount = 0;
     private ByteBuf[] dubboRequestHeaders;
+
+    static AtomicInteger num = new AtomicInteger(0);
 
     SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
 
@@ -148,15 +151,15 @@ public class ProviderClient {
                                     if (status == 100) {
                                         client.writeAndFlush('0', client.voidPromise());
                                     } else {
-                                        /*byteBuf.markWriterIndex();
+                                        byteBuf.markWriterIndex();
                                         byteBuf.markReaderIndex();
                                         byteBuf.readerIndex(byteBuf.readerIndex() + 2);
-                                        byteBuf.writerIndex(byteBuf.readerIndex() + httpDataLength);*/
-                                        client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
+                                        byteBuf.writerIndex(byteBuf.readerIndex() + httpDataLength);
+                                        //client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex() + 2, httpDataLength).retain(), client.voidPromise());
                                         //设置读写范围，避免slice
-                                        /*client.writeAndFlush(byteBuf.retain(), client.voidPromise());
+                                        client.writeAndFlush(byteBuf.retain(), client.voidPromise());
                                         byteBuf.resetWriterIndex();
-                                        byteBuf.resetReaderIndex();*/
+                                        byteBuf.resetReaderIndex();
                                     }
                                     //client.writeAndFlush(res.retain(), client.voidPromise());
                                 }
@@ -204,6 +207,7 @@ public class ProviderClient {
 
         channelHandlerContextMap.put(id, channelHandlerContext);
         if (channelFuture != null && channelFuture.isSuccess()) {
+            log.info("num:{}",num.getAndIncrement());
             Channel channel = channelFuture.channel();
             if (++sendCount < Constants.PROVIDER_BATCH_SIZE) {
                 channel.write(head.retain(), channel.voidPromise());

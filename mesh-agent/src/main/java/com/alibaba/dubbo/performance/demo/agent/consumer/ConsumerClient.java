@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/12
@@ -48,6 +49,7 @@ public class ConsumerClient {
     private ChannelFuture channelFuture;
 
     SpscLinkedQueue<ByteBuf> writeQueue = new SpscLinkedQueue<ByteBuf>();
+    static AtomicInteger num = new AtomicInteger(0);
 
 
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
@@ -153,6 +155,7 @@ public class ConsumerClient {
         channelHandlerContextMap.put(id, channelHandlerContext);
 
         if (channelFuture != null && channelFuture.isSuccess()) {
+            log.info("num:{}",num.getAndIncrement());
             Channel channel = channelFuture.channel();
             if (++sendCounter < Constants.BATCH_SIZE) {
                 channel.write(byteBuf, channel.voidPromise());

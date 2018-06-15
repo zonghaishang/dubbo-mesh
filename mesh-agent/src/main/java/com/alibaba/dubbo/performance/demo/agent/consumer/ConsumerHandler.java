@@ -81,10 +81,8 @@ public class ConsumerHandler extends ChannelInboundHandlerAdapter {
                 //byteBuf.writeInt(0);
                 byteBuf.resetWriterIndex();
 
-
-                byteBuf.readerIndex(byteBuf.writerIndex());
-
                 threadLocal.get().send(ctx, byteBuf.slice(paramStart - 8,paramLength+8).retain());
+                byteBuf.readerIndex(paramStart+paramLength);
             }
         }finally {
             ReferenceCountUtil.release(msg);
