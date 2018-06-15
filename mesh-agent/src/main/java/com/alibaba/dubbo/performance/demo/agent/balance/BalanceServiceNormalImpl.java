@@ -36,7 +36,12 @@ public class BalanceServiceNormalImpl implements BalanceService{
 
     @Override
     public int getId() {
-        return atomicInteger.getAndIncrement();
+        return atomicInteger.incrementAndGet();
+    }
+
+    @Override
+    public int currentId() {
+        return atomicInteger.get();
     }
 
     @Override

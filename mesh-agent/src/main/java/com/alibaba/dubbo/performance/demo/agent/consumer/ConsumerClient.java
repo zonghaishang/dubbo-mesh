@@ -4,12 +4,14 @@ import com.alibaba.dubbo.performance.demo.agent.balance.BalanceService;
 import com.alibaba.dubbo.performance.demo.agent.balance.BalanceServiceImpl;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
+import com.alibaba.dubbo.performance.demo.agent.util.CodecOutputList;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -18,7 +20,9 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.DecoderException;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.internal.StringUtil;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author 景竹 2018/5/12
+ * @author yiji@apache.org
  */
 public class ConsumerClient {
     private static final Logger log = LoggerFactory.getLogger(ConsumerClient.class);
@@ -51,6 +56,9 @@ public class ConsumerClient {
     SpscLinkedQueue<ByteBuf> writeQueue = new SpscLinkedQueue<ByteBuf>();
     static AtomicInteger num = new AtomicInteger(0);
 
+    ByteBuf cumulation;
+
+    private Object NULL_OBJECT = new Object();
 
     public void initConsumerClient(ChannelHandlerContext channelHandlerContext) {
         resByteBuf = channelHandlerContext.alloc().directBuffer(500).writeBytes(HTTP_HEAD);
@@ -78,45 +86,216 @@ public class ConsumerClient {
                         .option(ChannelOption.SO_SNDBUF, Constants.SEND_BUFFER_SIZE)
                         .handler(new ChannelInboundHandlerAdapter() {
 
+//                            @Override
+//                            public void channelRead(ChannelHandlerContext ctx, Object msg) {
+//                                ByteBuf byteBuf = (ByteBuf) msg;
+//                                try {
+//                                    while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
+//                                        byteBuf.markReaderIndex();
+//                                        //读id
+//                                        int id = byteBuf.readInt();
+//                                        //读整个数据的长度
+//                                        int dataLength = byteBuf.readInt();
+//                                        //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
+//                                        int byteToSkip = dataLength < 10 ? 1 : 2;
+//                                        //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
+//                                        if (byteBuf.readableBytes() < length + dataLength + byteToSkip) {
+//                                            byteBuf.resetReaderIndex();
+//                                            return;
+//                                        }
+//                                        ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+//                                        if (client != null) {
+//                                            //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
+//                                            //由于前面读了长度和id,后面就是完整的http结果了，直接slice
+//                                            /*client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), length + dataLength + byteToSkip).retain()
+//                                                    , client.voidPromise());*/
+//
+//                                            //设置读写范围，这样可以避免slice
+//                                            byteBuf.markWriterIndex();
+//                                            byteBuf.writerIndex(byteBuf.readerIndex() + length + dataLength + byteToSkip);
+//                                            client.writeAndFlush(byteBuf.retain()
+//                                                    , client.voidPromise());
+//                                            byteBuf.resetWriterIndex();
+//                                        } else {
+//                                            log.error("client is null .id:{}", id);
+//                                        }
+//                                        byteBuf.readerIndex(byteBuf.readerIndex() + length + dataLength + byteToSkip);
+//                                    }
+//                                } finally {
+//                                    ReferenceCountUtil.release(msg);
+//                                }
+//                            }
+
                             @Override
                             public void channelRead(ChannelHandlerContext ctx, Object msg) {
-                                ByteBuf byteBuf = (ByteBuf) msg;
+                                CodecOutputList out = CodecOutputList.newInstance();
                                 try {
-                                    while (byteBuf.readableBytes() > HTTP_HEAD.length + 8) {
-                                        byteBuf.markReaderIndex();
-                                        //读id
-                                        int id = byteBuf.readInt();
-                                        //读整个数据的长度
-                                        int dataLength = byteBuf.readInt();
-                                        //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
-                                        int byteToSkip = dataLength < 10 ? 1 : 2;
-                                        //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
-                                        if (byteBuf.readableBytes() < length + dataLength + byteToSkip) {
-                                            byteBuf.resetReaderIndex();
-                                            return;
+                                    if (msg instanceof ByteBuf) {
+                                        ByteBuf data = (ByteBuf) msg;
+                                        if (cumulation == null) {
+                                            cumulation = data;
+                                            try {
+                                                callDecode(ctx, cumulation, out);
+                                            } finally {
+                                                if (cumulation != null && !cumulation.isReadable()) {
+                                                    cumulation.release();
+                                                    cumulation = null;
+                                                }
+                                            }
+                                        } else {
+                                            try {
+                                                if (cumulation.writerIndex() > cumulation.maxCapacity() - data.readableBytes()) {
+                                                    ByteBuf oldCumulation = cumulation;
+                                                    cumulation = ctx.alloc().directBuffer(oldCumulation.readableBytes() + data.readableBytes());
+                                                    // 发生了数据拷贝，可以优化掉
+                                                    cumulation.writeBytes(oldCumulation);
+                                                    oldCumulation.release();
+                                                }
+                                                // 发生了数据拷贝，可以优化掉
+                                                cumulation.writeBytes(data);
+                                                callDecode(ctx, cumulation, out);
+                                            } finally {
+                                                if (cumulation != null) {
+                                                    if (cumulation != null) {
+                                                        if (!cumulation.isReadable() && cumulation.refCnt() == 1) {
+                                                            cumulation.release();
+                                                            cumulation = null;
+                                                        } else {
+                                                            if (cumulation.refCnt() == 1) {
+                                                                cumulation.discardSomeReadBytes();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                data.release();
+                                            }
                                         }
-                                        ChannelHandlerContext client = channelHandlerContextMap.remove(id);
-                                        if (client != null) {
-                                            //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
-                                            //由于前面读了长度和id,后面就是完整的http结果了，直接slice
+                                    } else {
+                                        out.add(msg);
+                                    }
+                                } catch (DecoderException e) {
+                                    throw e;
+                                } catch (Throwable t) {
+                                    throw new DecoderException(t);
+                                } finally {
+                                    out.recycle();
+                                }
+                            }
+
+                            protected void callDecode(ChannelHandlerContext ctx, ByteBuf in, CodecOutputList out) {
+                                try {
+                                    while (in.isReadable()) {
+                                        int outSize = out.size();
+
+                                        int oldInputLength = in.readableBytes();
+                                        decode(ctx, in, out);
+
+                                        // See https://github.com/netty/netty/issues/1664
+                                        if (ctx.isRemoved()) {
+                                            break;
+                                        }
+
+                                        if (outSize == out.size()) {
+                                            if (oldInputLength == in.readableBytes()) {
+                                                break;
+                                            } else {
+                                                continue;
+                                            }
+                                        }
+
+                                        if (oldInputLength == in.readableBytes()) {
+                                            throw new DecoderException(
+                                                    StringUtil.simpleClassName(getClass()) +
+                                                            ".decode() did not read anything but decoded a message.");
+                                        }
+                                    }
+                                } catch (DecoderException e) {
+                                    throw e;
+                                } catch (Throwable cause) {
+                                    throw new DecoderException(cause);
+                                }
+                            }
+
+                            protected void decode(ChannelHandlerContext ctx, ByteBuf byteBuf, List<Object> out) throws Exception {
+                                int savedReaderIndex = byteBuf.readerIndex();
+                                //读id
+                                int id = byteBuf.readInt();
+                                //读整个数据的长度
+                                int dataLength = byteBuf.readInt();
+                                //content-length占的位数不定，小于10占1byte（1-9），>= 则2byte
+                                int byteToSkip = dataLength < 10 ? 1 : 2;
+                                //可以读的长度应该是：固定的http头长度+\r\n长度+数据长度+content-length长度（不固定）
+                                if (byteBuf.readableBytes() < length + dataLength + byteToSkip) {
+                                    byteBuf.readerIndex(savedReaderIndex);
+                                    return;
+                                }
+                                ChannelHandlerContext client = channelHandlerContextMap.remove(id);
+                                int len = byteBuf.readerIndex() + length + dataLength + byteToSkip;
+                                if (client != null) {
+                                    //消息的格式为： 4byte（int长度）+ 4byte（int id）+ provider agent完整拼接好的http response
+                                    //由于前面读了长度和id,后面就是完整的http结果了，直接slice
                                             /*client.writeAndFlush(byteBuf.slice(byteBuf.readerIndex(), length + dataLength + byteToSkip).retain()
                                                     , client.voidPromise());*/
 
-                                            //设置读写范围，这样可以避免slice
-                                            byteBuf.markWriterIndex();
-                                            byteBuf.writerIndex(byteBuf.readerIndex() + length + dataLength + byteToSkip);
-                                            client.writeAndFlush(byteBuf.retain()
-                                                    , client.voidPromise());
-                                            byteBuf.resetWriterIndex();
-                                        } else {
-                                            log.error("client is null .id:{}", id);
-                                        }
-                                        byteBuf.readerIndex(byteBuf.readerIndex() + length + dataLength + byteToSkip);
+                                    //设置读写范围，这样可以避免slice
+                                    byteBuf.markWriterIndex();
+                                    byteBuf.writerIndex(len);
+
+                                    /**
+                                     * 最优化的做法是 bytebuf放入到out列表，最后flush，
+                                     * 但是现在分context ,要怎么处理？？
+                                     * 先保证不丢包
+                                     */
+                                    out.add(NULL_OBJECT);
+
+                                    client.writeAndFlush(byteBuf.retain(), client.voidPromise());
+                                    byteBuf.resetWriterIndex();
+                                } else {
+                                    log.error("client is null .id:{}", id);
+                                }
+                                byteBuf.readerIndex(len);
+
+                            }
+
+                            @Override
+                            public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                                log.error("consumer hander closed");
+                                CodecOutputList out = CodecOutputList.newInstance();
+                                try {
+                                    if (cumulation != null) {
+                                        callDecode(ctx, cumulation, out);
+                                        decodeLast(ctx, cumulation, out);
+                                    } else {
+                                        decodeLast(ctx, Unpooled.EMPTY_BUFFER, out);
                                     }
+                                } catch (DecoderException e) {
+                                    throw e;
+                                } catch (Exception e) {
+                                    throw new DecoderException(e);
                                 } finally {
-                                    ReferenceCountUtil.release(msg);
+                                    if (cumulation != null) {
+                                        cumulation.release();
+                                        cumulation = null;
+                                    }
                                 }
                             }
+
+                            @Override
+                            public final void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                                ByteBuf buf = cumulation != null ? cumulation : Unpooled.EMPTY_BUFFER;
+                                int readable = buf.readableBytes();
+                                if (buf.isReadable()) {
+                                    ByteBuf bytes = buf.readBytes(readable);
+                                    buf.release();
+                                    ctx.fireChannelRead(bytes);
+                                }
+                                cumulation = null;
+                            }
+
+                            protected void decodeLast(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+                                decode(ctx, in, out);
+                            }
+
                         }).group(channelHandlerContext.channel().eventLoop())
                         .connect(
                                 new InetSocketAddress(endpoint.getHost(), endpoint.getPort()))
@@ -155,14 +334,19 @@ public class ConsumerClient {
         channelHandlerContextMap.put(id, channelHandlerContext);
 
         if (channelFuture != null && channelFuture.isSuccess()) {
-            log.info("num:{}",num.getAndIncrement());
+            log.info("num:{}", num.incrementAndGet());
             Channel channel = channelFuture.channel();
             if (++sendCounter < Constants.BATCH_SIZE) {
-                channel.write(byteBuf, channel.voidPromise());
+                channel.writeAndFlush(byteBuf, channel.voidPromise());
             } else {
                 channel.writeAndFlush(byteBuf, channel.voidPromise());
                 sendCounter = 0;
             }
+
+            if (!channel.isWritable()) {
+                log.info(" unwritable channel:" + channel + ", bytesBeforeUnwritable" + channel.bytesBeforeUnwritable());
+            }
+
         } else {
             ReferenceCountUtil.release(byteBuf);
             ByteBuf res = channelHandlerContext.alloc().directBuffer();
@@ -173,6 +357,10 @@ public class ConsumerClient {
             channelHandlerContext.writeAndFlush(res, channelHandlerContext.channel().voidPromise());
         }
 
+    }
+
+    public void flush(ChannelHandlerContext channelHandlerContext) {
+        channelHandlerContext.flush();
     }
 
     public ChannelFuture getChannel(int port) {

@@ -22,11 +22,18 @@ public class BalanceServiceImpl implements BalanceService {
     private static final int MAX_NUM = 200;
     private Random random = new Random();
     private static final BlockingQueue<Integer> INIT_NODE_QUEUE = new ArrayBlockingQueue(32);
+
     static {
+//        INIT_NODE_QUEUE.addAll(Arrays.asList(
+//                30000, 30000, 30000, 30000
+//                , 30000, 30000, 30000, 30000, 30000, 30000
+//                , 30000, 30000, 30000, 30000, 30000, 30000
+//        ));
+
         INIT_NODE_QUEUE.addAll(Arrays.asList(
-                30000,30000,30000,30000
-                ,30001,30001,30001,30001,30001,30001
-                ,30002,30002,30002,30002,30002,30002
+                30000, 30000, 30000, 30000
+                , 30001, 30001, 30001, 30001, 30001, 30001
+                , 30002, 30002, 30002, 30002, 30002, 30002
         ));
     }
 
@@ -47,7 +54,7 @@ public class BalanceServiceImpl implements BalanceService {
         //port计数在数组中的位置，取最后两byte的值，得到0、1、2
         int index = port & MASK;
         //超过阀值会线程溢出，则再选一次
-        if(counter.get(index) > MAX_NUM){
+        if (counter.get(index) > MAX_NUM) {
             //遍历找到没满的port,优先large
             for (int i = 2; i >= 0; i--) {
                 if (counter.get(i) <= MAX_NUM) {
@@ -69,7 +76,7 @@ public class BalanceServiceImpl implements BalanceService {
         //port计数在数组中的位置，取最后两byte的值，得到0、1、2
         int index = port & MASK;
         //超过阀值会线程溢出，则再选一次
-        if(counter.get(index) + batchSize > MAX_NUM){
+        if (counter.get(index) + batchSize > MAX_NUM) {
             //遍历找到没满的port,优先large
             /*for (int i = 2; i >= 0; i--) {
                 if (counter.get(i) + batchSize <= MAX_NUM) {
@@ -80,10 +87,10 @@ public class BalanceServiceImpl implements BalanceService {
             //全满，直接返回
             return 0;*/
             int p = getRandom();
-            counter.addAndGet(p & MASK,batchSize);
+            counter.addAndGet(p & MASK, batchSize);
             return p;
         }
-        counter.addAndGet(index,batchSize);
+        counter.addAndGet(index, batchSize);
         return port;
     }
 
@@ -94,31 +101,36 @@ public class BalanceServiceImpl implements BalanceService {
 
     @Override
     public int getId() {
-        return atomicInteger.getAndIncrement();
+        return atomicInteger.incrementAndGet();
     }
 
     @Override
-    public void releaseCount(SocketAddress port){
+    public int currentId() {
+        return atomicInteger.get();
+    }
+
+    @Override
+    public void releaseCount(SocketAddress port) {
         /*int remotePort = ((InetSocketAddress)port).getPort();
         int count = counter.decrementAndGet(remotePort & MASK);*/
-        counter.decrementAndGet(((InetSocketAddress)port).getPort() & MASK);
+        counter.decrementAndGet(((InetSocketAddress) port).getPort() & MASK);
         //logger.info("remotePort:"+remotePort+" count:"+count);
     }
 
     @Override
-    public void releaseCount(int port){
+    public void releaseCount(int port) {
         counter.decrementAndGet(port & MASK);
     }
 
     @Override
-    public void addCount(int count,int port) {
-        counter.addAndGet(port & MASK,count);
+    public void addCount(int count, int port) {
+        counter.addAndGet(port & MASK, count);
     }
 
     @Override
-    public int getInitNode(){
+    public int getInitNode() {
         Integer port = INIT_NODE_QUEUE.poll();
-        if(port == null){
+        if (port == null) {
             return 0;
         }
         return port;

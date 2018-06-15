@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * @author 景竹 2018/5/12
+ * @author yiji@apache.org
  */
 public class ConsumerServer {
     private static final Logger log = LoggerFactory.getLogger(ConsumerServer.class);
@@ -35,8 +36,8 @@ public class ConsumerServer {
                 .option(ChannelOption.SO_RCVBUF, Constants.RECEIVE_BUFFER_SIZE)
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Constants.CONNECT_TIME_OUT)
-                .option(ChannelOption.TCP_NODELAY, true)
-                .option(ChannelOption.SO_KEEPALIVE, true)
+//                .option(ChannelOption.TCP_NODELAY, true)
+//                .option(ChannelOption.SO_KEEPALIVE, true)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
@@ -45,8 +46,8 @@ public class ConsumerServer {
                         ch.config().setAllocator(PooledByteBufAllocator.DEFAULT);
                         ch.config().setReceiveBufferSize(Constants.RECEIVE_BUFFER_SIZE);
                         ch.config().setSendBufferSize(Constants.SEND_BUFFER_SIZE);
-                        ch.config().setTcpNoDelay(true);
-                        ch.config().setKeepAlive(true);
+//                        ch.config().setTcpNoDelay(true);
+//                        ch.config().setKeepAlive(true);
                         //ch.pipeline().addLast(new InternalReadTimeoutHandler(2000, TimeUnit.MILLISECONDS));
                         ch.pipeline().addLast(new ConsumerHandler());
                     }

@@ -14,6 +14,8 @@ public interface BalanceService {
 
     int getId();
 
+    int currentId();
+
     void releaseCount(SocketAddress port);
 
     void releaseCount(int port);
