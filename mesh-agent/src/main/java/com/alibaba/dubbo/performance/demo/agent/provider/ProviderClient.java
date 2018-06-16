@@ -361,7 +361,7 @@ public class ProviderClient {
                     @Override
                     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
                         log.error("consumer hander closed");
-                        CodecOutputList out = CodecOutputList.newInstance();
+//                        CodecOutputList out = CodecOutputList.newInstance();
                         try {
                             if (cumulation != null) {
                                 callDecode(ctx, cumulation);
