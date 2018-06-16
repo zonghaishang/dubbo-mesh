@@ -27,7 +27,7 @@ public class ProviderService {
         ServerBootstrap bootstrap = new ServerBootstrap();
         EventLoopGroup boss = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
         //EventLoopGroup boss0 = new NioEventLoopGroup(Constants.EVENT_LOOP_NUM);
-        //((NioEventLoopGroup) boss).setIoRatio(100);
+        ((NioEventLoopGroup) boss).setIoRatio(100);
         bootstrap.group(boss)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.ALLOCATOR,PooledByteBufAllocator.DEFAULT)
