@@ -20,6 +20,10 @@ if [[ "$1" == "consumer" ]]; then
        -Dlogs.dir=/root/logs \
        -Dnetty.server=8870 \
        -Dio.netty.leakDetectionLevel=DISABLED \
+       -Dio.netty.allocator.numHeapArenas=16 \
+       -Dio.netty.allocator.numDirectArenas=16 \
+       -Dio.netty.buffer.bytebuf.checkAccessible=false \
+       -Dio.netty.onKeySetOptimization=true \
        /root/dists/mesh-agent.jar
 elif [[ "$1" == "provider-small" ]]; then
   echo "Starting small provider agent..."
@@ -36,6 +40,9 @@ elif [[ "$1" == "provider-small" ]]; then
        -Dlogs.dir=/root/logs \
        -Ddubbo.application.qos.enable=false \
        -Dio.netty.leakDetectionLevel=DISABLED \
+       -Dio.netty.allocator.numHeapArenas=16 \
+       -Dio.netty.allocator.numDirectArenas=16 \
+       -Dio.netty.buffer.bytebuf.checkAccessible=false \
        /root/dists/mesh-agent.jar
 elif [[ "$1" == "provider-medium" ]]; then
   echo "Starting medium provider agent..."
@@ -52,6 +59,9 @@ elif [[ "$1" == "provider-medium" ]]; then
        -Dlogs.dir=/root/logs \
        -Ddubbo.application.qos.enable=false \
        -Dio.netty.leakDetectionLevel=DISABLED \
+       -Dio.netty.allocator.numHeapArenas=16 \
+       -Dio.netty.allocator.numDirectArenas=16 \
+       -Dio.netty.buffer.bytebuf.checkAccessible=false \
        /root/dists/mesh-agent.jar
 elif [[ "$1" == "provider-large" ]]; then
   echo "Starting large provider agent..."
@@ -68,6 +78,9 @@ elif [[ "$1" == "provider-large" ]]; then
        -Dlogs.dir=/root/logs \
        -Ddubbo.application.qos.enable=false \
        -Dio.netty.leakDetectionLevel=DISABLED \
+       -Dio.netty.allocator.numHeapArenas=16 \
+       -Dio.netty.allocator.numDirectArenas=16 \
+       -Dio.netty.buffer.bytebuf.checkAccessible=false \
        /root/dists/mesh-agent.jar
 else
   echo "Unrecognized arguments, exit."

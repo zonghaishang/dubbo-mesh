@@ -1,7 +1,6 @@
 package com.alibaba.dubbo.performance.demo.agent.provider;
 
 import com.alibaba.dubbo.performance.demo.agent.registry.IpHelper;
-import com.alibaba.dubbo.performance.demo.agent.util.CodecOutputList;
 import com.alibaba.dubbo.performance.demo.agent.util.Constants;
 import com.alibaba.dubbo.performance.demo.agent.util.InternalIntObjectHashMap;
 
@@ -16,7 +15,6 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.DecoderException;
 import io.netty.util.internal.shaded.org.jctools.queues.SpscLinkedQueue;
@@ -66,11 +64,11 @@ public class ProviderClient {
 
     private ByteBuf zero0;
 
-    static AtomicInteger num = new AtomicInteger(0);
+//    static AtomicInteger num = new AtomicInteger(0);
 
-    static AtomicInteger drop = new AtomicInteger(0);
+//    static AtomicInteger drop = new AtomicInteger(0);
 
-    static AtomicInteger receivedFromDubbo = new AtomicInteger(0);
+//    static AtomicInteger receivedFromDubbo = new AtomicInteger(0);
 
     SpscLinkedQueue<ByteBuf> readQueue = new SpscLinkedQueue<ByteBuf>();
 
@@ -193,50 +191,52 @@ public class ProviderClient {
                     @Override
                     public void channelRead(ChannelHandlerContext ctx, Object msg) {
                         try {
-                            if (msg instanceof ByteBuf) {
-                                ByteBuf data = (ByteBuf) msg;
-                                if (cumulation == null) {
-                                    cumulation = data;
-                                    try {
-                                        callDecode(ctx, cumulation);
-                                    } finally {
-                                        if (cumulation != null && !cumulation.isReadable()) {
-                                            cumulation.release();
-                                            cumulation = null;
-                                        }
+
+                            ByteBuf data = (ByteBuf) msg;
+                            if (cumulation == null) {
+                                cumulation = data;
+                                try {
+                                    callDecode(ctx, cumulation);
+                                } finally {
+                                    if (cumulation != null && !cumulation.isReadable()) {
+                                        cumulation.release();
+                                        cumulation = null;
                                     }
-                                } else {
-                                    try {
-                                        if (cumulation.writerIndex() > cumulation.maxCapacity() - data.readableBytes()) {
-                                            ByteBuf oldCumulation = cumulation;
-                                            cumulation = ctx.alloc().heapBuffer(oldCumulation.readableBytes() + data.readableBytes());
-                                            // 发生了数据拷贝，可以优化掉
-                                            cumulation.writeBytes(oldCumulation);
-                                            oldCumulation.release();
-                                        }
+                                }
+                            } else {
+                                try {
+                                    if (cumulation.writerIndex() > cumulation.maxCapacity() - data.readableBytes()) {
+                                        ByteBuf oldCumulation = cumulation;
+                                        cumulation = ctx.alloc().heapBuffer(oldCumulation.readableBytes() + data.readableBytes());
                                         // 发生了数据拷贝，可以优化掉
-                                        cumulation.writeBytes(data);
-                                        callDecode(ctx, cumulation);
-                                    } finally {
+                                        cumulation.writeBytes(oldCumulation);
+                                        oldCumulation.release();
+                                    }
+                                    // 发生了数据拷贝，可以优化掉
+                                    cumulation.writeBytes(data);
+                                    callDecode(ctx, cumulation);
+                                } finally {
+                                    if (cumulation != null) {
                                         if (cumulation != null) {
-                                            if (cumulation != null) {
-                                                if (!cumulation.isReadable() && cumulation.refCnt() == 1) {
-                                                    cumulation.release();
-                                                    cumulation = null;
-                                                } else {
-                                                    if (cumulation.refCnt() == 1) {
-                                                        cumulation.discardSomeReadBytes();
-                                                    }
+                                            if (!cumulation.isReadable() && cumulation.refCnt() == 1) {
+                                                cumulation.release();
+                                                cumulation = null;
+                                            } else {
+                                                if (cumulation.refCnt() == 1) {
+                                                    cumulation.discardSomeReadBytes();
                                                 }
                                             }
                                         }
-                                        data.release();
                                     }
+                                    data.release();
                                 }
                             }
+
                         } catch (DecoderException e) {
+                            log.error("decode dubbo", e);
                             throw e;
                         } catch (Throwable t) {
+                            log.error("decode dubbo", t);
                             throw new DecoderException(t);
                         }
                     }
@@ -280,6 +280,11 @@ public class ProviderClient {
                             int id = (int) byteBuf.readLong();
                             int dataLength = byteBuf.readInt();
 
+                            if (byteBuf.readableBytes() < dataLength) {
+                                byteBuf.readerIndex(savedReaderIndex);
+                                return;
+                            }
+
                             // 如果是事件
                             if ((byteBuf.getByte(savedReaderIndex + 2) & FLAG_EVENT) != 0) {
 
@@ -297,11 +302,6 @@ public class ProviderClient {
                             if (status != 20 && status != 100) {
                                 log.error("非20结果集, status:" + status);
                                 byteBuf.readerIndex(byteBuf.readerIndex() + dataLength);
-                                return;
-                            }
-
-                            if (byteBuf.readableBytes() < dataLength) {
-                                byteBuf.readerIndex(savedReaderIndex);
                                 return;
                             }
 

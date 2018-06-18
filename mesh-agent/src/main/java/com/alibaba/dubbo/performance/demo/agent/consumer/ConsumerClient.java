@@ -127,47 +127,47 @@ public class ConsumerClient {
                             @Override
                             public void channelRead(ChannelHandlerContext ctx, Object msg) {
                                 try {
-                                    if (msg instanceof ByteBuf) {
-                                        ByteBuf data = (ByteBuf) msg;
-                                        if (cumulation == null) {
-                                            cumulation = data;
-                                            try {
-                                                callDecode(ctx, cumulation);
-                                            } finally {
-                                                if (cumulation != null && !cumulation.isReadable()) {
-                                                    cumulation.release();
-                                                    cumulation = null;
-                                                }
+
+                                    ByteBuf data = (ByteBuf) msg;
+                                    if (cumulation == null) {
+                                        cumulation = data;
+                                        try {
+                                            callDecode(ctx, cumulation);
+                                        } finally {
+                                            if (cumulation != null && !cumulation.isReadable()) {
+                                                cumulation.release();
+                                                cumulation = null;
                                             }
-                                        } else {
-                                            try {
-                                                if (cumulation.writerIndex() > cumulation.maxCapacity() - data.readableBytes()) {
-                                                    ByteBuf oldCumulation = cumulation;
-                                                    cumulation = ctx.alloc().heapBuffer(oldCumulation.readableBytes() + data.readableBytes());
-                                                    // 发生了数据拷贝，可以优化掉
-                                                    cumulation.writeBytes(oldCumulation);
-                                                    oldCumulation.release();
-                                                }
+                                        }
+                                    } else {
+                                        try {
+                                            if (cumulation.writerIndex() > cumulation.maxCapacity() - data.readableBytes()) {
+                                                ByteBuf oldCumulation = cumulation;
+                                                cumulation = ctx.alloc().heapBuffer(oldCumulation.readableBytes() + data.readableBytes());
                                                 // 发生了数据拷贝，可以优化掉
-                                                cumulation.writeBytes(data);
-                                                callDecode(ctx, cumulation);
-                                            } finally {
+                                                cumulation.writeBytes(oldCumulation);
+                                                oldCumulation.release();
+                                            }
+                                            // 发生了数据拷贝，可以优化掉
+                                            cumulation.writeBytes(data);
+                                            callDecode(ctx, cumulation);
+                                        } finally {
+                                            if (cumulation != null) {
                                                 if (cumulation != null) {
-                                                    if (cumulation != null) {
-                                                        if (!cumulation.isReadable() && cumulation.refCnt() == 1) {
-                                                            cumulation.release();
-                                                            cumulation = null;
-                                                        } else {
-                                                            if (cumulation.refCnt() == 1) {
-                                                                cumulation.discardSomeReadBytes();
-                                                            }
+                                                    if (!cumulation.isReadable() && cumulation.refCnt() == 1) {
+                                                        cumulation.release();
+                                                        cumulation = null;
+                                                    } else {
+                                                        if (cumulation.refCnt() == 1) {
+                                                            cumulation.discardSomeReadBytes();
                                                         }
                                                     }
                                                 }
-                                                data.release();
                                             }
+                                            data.release();
                                         }
                                     }
+
                                 } catch (DecoderException e) {
                                     throw e;
                                 } catch (Throwable t) {
